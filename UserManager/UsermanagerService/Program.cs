@@ -37,7 +37,14 @@ app.MapGet("/login", [AllowAnonymous](string username, string password) =>
 
 app.MapGet("/fetch", (int userID) =>
 {
-    
+    try
+    {
+        return JsonSerializer.Serialize(DB.FetchUser(userID));
+    }
+    catch (Exception ex)
+    {
+        return ex.Message; 
+    }
 }).RequireAuthorization();
 
 app.MapGet("/verify", () =>
