@@ -3,27 +3,36 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using UsermanagerService.Models;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 var builder = WebApplication.CreateBuilder(args);
-var DB = new DBService();
+var DB = new DBService("");
 
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
-app.UseAuthentication();
-app.UseAuthorization();
 
-app.MapPost("/login", [AllowAnonymous](string username, string password) =>
+app.MapGet("/login", [AllowAnonymous](string username, string password) =>
 {
-    if(DB.ContainsCredentials(username, password))
+    try
     {
-        return true;
+        User? user = DB.ContainsCredentials(username, password);
+        if (user != null)
+        {
+            return JsonSerializer.Serialize(new Tuple<User, string>(user, DB.GenerateToken(builder)));
+            
+        }
+        else
+        {
+            return "false";
+        }
     }
-    else
+    catch
     {
-        return false;
+       return "Unavailable";
     }
-
+    
 });
 
 app.MapGet("/fetch", (int userID) =>
@@ -60,4 +69,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.Run();
