@@ -54,9 +54,22 @@ app.MapGet("/verify", () =>
 
 app.MapPost("/Create", [AllowAnonymous] (string username, string password, string city, string institue, string role) =>
 {
+    User userObject = new User(0, username, city, institue, role);
+    if (DB.AddNewUser(userObject, password))
+    {
+        return true;
+    }else { return false; }
 
 });
-  
+
+app.MapPost("/delete", (int userId) =>
+{
+    if (DB.DeleteUser(userId))
+    {
+        return true;
+    }
+    else{ return false; }
+});
 
 builder.Services.AddAuthentication(options =>
 {
