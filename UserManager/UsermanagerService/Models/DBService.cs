@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Reflection.PortableExecutable;
 using System.Security.Claims;
 using System.Text;
+using UsermanagerService.Exceptions;
 
 namespace UsermanagerService.Models
 {
@@ -153,11 +154,20 @@ namespace UsermanagerService.Models
         /// <returns>True if user added correctly</returns>
         public bool AddNewUser(User user, string password)
         {
+            bool result;
             SqlConnection connection = new SqlConnection(URL);
             List<int> ids = new List<int>();
             //Queries
-            string insertQuery = $"INSERT INTO user ({user.username}, {user.city}, {user.institute}, {user.role})";
-            string getIdQuery = $"SELECT id FROM user WHERE username = {user.username} city = {user.city} institute = {user.institute} role  = {user.role}";
+
+            string insertQuery = $"IF NOT EXIST " +
+                       $"SELECT * FROM user" +
+                       $"WHERE username = {user.username}" +
+                       $"BEGIN " +
+                       $"INSERT INTO user ({user.username}, {user.city}, {user.institute}, {user.role})" +
+                       $"END";
+
+            string getIdQuery = $"SELECT id FROM user" +
+                                $" WHERE username = {user.username} city = {user.city} institute = {user.institute} role  = {user.role}";
 
             //SQL Commands
             SqlCommand insertCommand = new SqlCommand(insertQuery, connection); //The command to insert user into user table
@@ -167,31 +177,39 @@ namespace UsermanagerService.Models
             try
             {
                 connection.Open();
+                if (insertCommand.ExecuteNonQuery() == 0)//execute insertion in user table
+                {
+                    throw new InsertionException("Insertion Failed");
+                }
 
-                insertCommand.ExecuteNonQuery(); //execute insertion in user table
-               
                 SqlDataReader reader = IdCommand.ExecuteReader(); //read from the user table   
 
-                while (reader.Read()){ ids.Add((int)reader[0]);}
+                while (reader.Read()) { ids.Add((int)reader[0]); }
 
                 reader.Close();
 
                 if (ids.Count != 1) { throw new Exception("Too many id"); }
-                else{ passwordCommand.ExecuteNonQuery(); } // Execute insertion in password table
+                else { passwordCommand.ExecuteNonQuery(); } // Execute insertion in password table
 
                 IdCommand.Dispose();
                 insertCommand.Dispose();
                 passwordCommand.Dispose();
-                connection.Close();
-                
-                return true;
-            }catch
-            {
-                //Implement SQL ROLLBACK
-                connection.Close();
-                return false;
+
+                result = true;
             }
+            catch (InsertionException ex) { result = false; }
+            catch (Exception ex) {
+
+                //ROLLBACK
+                throw new DatabaseException("DATABASE ERROR");
             
+            
+            
+            }
+            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
+
+            return result;
+
         }
         
         /// <summary>
@@ -199,30 +217,9 @@ namespace UsermanagerService.Models
         /// </summary>
         /// <param name="builder"></param>
         /// <returns>Token string</returns>
-        public string GenerateToken(WebApplicationBuilder builder)
+        public string GenerateToken()
         {
-            var issuer = builder.Configuration["Jwt:Issuer"];
-            var key = Encoding.ASCII.GetBytes
-            (builder.Configuration["Jwt:Key"]);
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(new[]
-                {
-                new Claim("Id", Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Jti,
-                Guid.NewGuid().ToString())
-             }),
-                Expires = DateTime.UtcNow.AddMinutes(30),
-                Issuer = issuer,
-                SigningCredentials = new SigningCredentials
-                (new SymmetricSecurityKey(key),
-                SecurityAlgorithms.HmacSha512Signature)
-            };
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            var jwtToken = tokenHandler.WriteToken(token);
-            var stringToken = tokenHandler.WriteToken(token);
-            return stringToken;
+            return "Temp Authentication token";
 
         }
 
