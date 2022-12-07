@@ -35,23 +35,19 @@ var app = builder.Build();
 
 app.MapGet("/login", [AllowAnonymous](string username, string password) =>
 {
+    
     try
     {
-        User? user = DB.ContainsCredentials(username, password);
-        if (user != null)
-        {
-            return Results.Ok(JsonSerializer.Serialize(new Tuple<User, string>(user, DB.GenerateToken())));
-            
-        }
-        else
-        {
-            return Results.Unauthorized();
-        }
+        User user = DB.ContainsCredentials(username, password);
+        string token = DB.GenerateToken();
+        Tuple<User, string> tuple = new Tuple<User, string>(user, token);
+
+        return Results.Ok(JsonSerializer.Serialize(tuple));
+      
     }
-    catch
-    {
-       return Results.Problem("DB unavailable");
-    }
+    catch (DatabaseException ex) { return Results.StatusCode(503); }
+    catch (MultipleInstanceException ex) { return Results.Problem($"Found {ex.Message} users"); }
+    catch (NoInstanceException) { return Results.Unauthorized(); }
     
 });
 
@@ -61,10 +57,9 @@ app.MapGet("/fetch", (int userID) =>
     {
         return Results.Ok(JsonSerializer.Serialize(DB.FetchUser(userID)));
     }
-    catch (Exception ex)
-    {
-        return Results.Problem(ex.Message); 
-    }
+    catch (DatabaseException ex){ return Results.StatusCode(503); }//return serice unavailable
+    catch (MultipleInstanceException ex) { return Results.Problem(ex.Message); }
+    catch (NoInstanceException) { return Results.NotFound(false); }
 }).RequireAuthorization();
 
 app.MapGet("/verify", () =>
@@ -95,9 +90,9 @@ app.MapPost("/delete", (int userId) =>
 {
     if (DB.DeleteUser(userId))
     {
-        return true;
+        return Results.Ok(true);
     }
-    else{ return false; }
+    else{ return Results.NotFound(false); }
 });
 
 

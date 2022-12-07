@@ -48,17 +48,15 @@ namespace UsermanagerService.Models
 
                 reader.Close();
                 command.Dispose();
-                connection.Close();
-
-                if (users.Count == 1){ return users[0];}
-                else{return null;}
+               
+                if(users.Count != 0) {
+                    if (users.Count == 1) { return users[0]; }
+                    else { throw new MultipleInstanceException($"{users.Count}"); }
+                }
+                else{ throw new NoInstanceException(""); }
             }
-            catch (Exception)
-            {
-                command.Dispose();
-                connection.Close();
-                return null;
-            }
+            catch (SqlException) { throw new DatabaseException("Database Error"); }
+            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
         }
 
         /// <summary>
@@ -89,29 +87,18 @@ namespace UsermanagerService.Models
 
                 reader.Close();
                 command.Dispose();
-                connection.Close();
+               
 
-                if (users != null)
+                if (users.Count != 0)
                 {
-                    if (users.Count > 1) { throw new Exception("USERID not unique"); }
-                    else
-                    {
-                        return users[0];
-                    }
+                    if (users.Count > 1) { throw new MultipleInstanceException($"Found {users.Count} ID"); }
+                    else { return users[0]; }
                 }
-                else
-                {
-                    throw new Exception("User not found in database");
-                }
-            }catch(Exception ex)
-            {
-                if (ex is SqlException)
-                {
-                    throw (SqlException)ex;
-                }
-                else
-                { throw new Exception("Fail"); }
+                else { throw new NoInstanceException("No User found"); }
+
             }
+            catch (SqlException ex) { throw new DatabaseException(ex.Message); }
+            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
         }
 
         /// <summary>
@@ -142,7 +129,8 @@ namespace UsermanagerService.Models
                 //Implement SQL ROLLBACK
                 return false;
             }
-            
+            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
+
 
         }
 
@@ -177,7 +165,7 @@ namespace UsermanagerService.Models
             try
             {
                 connection.Open();
-                if (insertCommand.ExecuteNonQuery() == 0)//execute insertion in user table
+                if (insertCommand.ExecuteNonQuery() != 1)//execute insertion in user table
                 {
                     throw new InsertionException("Insertion Failed");
                 }
@@ -187,28 +175,23 @@ namespace UsermanagerService.Models
                 while (reader.Read()) { ids.Add((int)reader[0]); }
 
                 reader.Close();
-
-                if (ids.Count != 1) { throw new Exception("Too many id"); }
-                else { passwordCommand.ExecuteNonQuery(); } // Execute insertion in password table
-
                 IdCommand.Dispose();
                 insertCommand.Dispose();
                 passwordCommand.Dispose();
 
-                result = true;
+                if (ids.Count != 1) { throw new MultipleInstanceException($"{ids.Count}"); }
+                else { passwordCommand.ExecuteNonQuery(); } // Execute insertion in password table
+
+                return true;
             }
-            catch (InsertionException ex) { result = false; }
-            catch (Exception ex) {
+            catch (InsertionException ex) { return false; }
+            catch (SqlException ex) {
 
                 //ROLLBACK
                 throw new DatabaseException("DATABASE ERROR");
             
-            
-            
             }
             finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
-
-            return result;
 
         }
         
