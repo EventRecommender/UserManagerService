@@ -6,9 +6,12 @@ using UsermanagerService.Models;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using UsermanagerService.Exceptions;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
-var builder = WebApplication.CreateBuilder(args);
-var DB = new DBService("");
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+var dBService = new DBService("");
+Authenticator auth = new Authenticator();
 
 builder.Services.AddAuthentication(options =>
 {
@@ -19,83 +22,115 @@ builder.Services.AddAuthentication(options =>
 {
     o.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidIssuer = builder.Configuration["JWT:Issuer"],
+        ValidAudience = builder.Configuration["JWT:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey
-        (Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+            (Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"])),
         ValidateIssuer = true,
+        ValidateAudience = true,
         ValidateLifetime = false,
         ValidateIssuerSigningKey = true
     };
 });
 
-
 builder.Services.AddAuthorization();
+
 
 var app = builder.Build();
 
-app.MapGet("/login", [AllowAnonymous](string username, string password) =>
-{
-    
+app.MapPost("/login", (string username, byte[] password) =>
+{    
     try
     {
-        User user = DB.ContainsCredentials(username, password);
-        string token = DB.GenerateToken();
-        Tuple<User, string> tuple = new Tuple<User, string>(user, token);
+        var login = auth.Login(username, password);
+        
+        if (login == null) { return Results.Unauthorized(); }
 
-        return Results.Ok(JsonSerializer.Serialize(tuple));
-      
+        return Results.Accepted(JsonSerializer.Serialize(login));
+
     }
     catch (DatabaseException ex) { return Results.StatusCode(503); }
-    catch (MultipleInstanceException ex) { return Results.Problem($"Found {ex.Message} users"); }
-    catch (NoInstanceException) { return Results.Unauthorized(); }
+    catch (Exception ex) { return Results.Problem(detail:ex.Message); }
+    
     
 });
 
 app.MapGet("/fetch", (int userID) =>
-{
+{ 
     try
     {
-        return Results.Ok(JsonSerializer.Serialize(DB.FetchUser(userID)));
+        User user = dBService.FetchUserFromID(userID);
+        return Results.Accepted(JsonSerializer.Serialize(user));
     }
-    catch (DatabaseException ex){ return Results.StatusCode(503); }//return serice unavailable
-    catch (MultipleInstanceException ex) { return Results.Problem(ex.Message); }
-    catch (NoInstanceException) { return Results.NotFound(false); }
-}).RequireAuthorization();
+    catch (DatabaseException ex) { return Results.StatusCode(503); }//return serice unavailable
+    catch (InstanceException ex) { return Results.Problem(detail: $"Found {ex.Message} users"); }
+});
 
-app.MapGet("/verify", () =>
+app.MapGet("/verify", (string token) =>
 {
     return true;
-}).RequireAuthorization();
+});
 
-app.MapPut("/Create", [AllowAnonymous] (string username, string password, string city, string institue, string role) =>
+app.MapPut("/Create", (string username, byte[] password, string city, string institue, string role) =>
 {
-    User userObject = new User(0, username, city, institue, role);
+    UIntUser UnitializedUser = new UIntUser(username, city, institue, role);
+
     try
     {
-        if (DB.AddNewUser(userObject, password))
-        {
-            return Results.Ok(true);
-        }
+        if (dBService.AddUser(UnitializedUser, password)){ return Results.Ok(true); }
         else { return Results.Conflict("User could not be created"); }
     }
     catch (DatabaseException ex)
     {
         return Results.Problem(ex.Message);
     }
-   
-
 });
 
 app.MapPost("/delete", (int userId) =>
 {
-    if (DB.DeleteUser(userId))
+    if (dBService.DeleteUser(userId))
     {
         return Results.Ok(true);
     }
     else{ return Results.NotFound(false); }
 });
 
+app.MapPost("/CreateToken", (string username, string password) =>
+{
 
+    if (username == "Test" && password == "test123")
+    {
+        var issuer = builder.Configuration["JWT:Issuer"];
+        var audience = builder.Configuration["JWT:Audience"];
+        var key = Encoding.ASCII.GetBytes
+        (builder.Configuration["JWT:Key"]);
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[]
+            {
+                new Claim("Id", Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Sub, username),
+                new Claim(JwtRegisteredClaimNames.Email, username),
+                new Claim(JwtRegisteredClaimNames.Jti,
+                Guid.NewGuid().ToString())
+             }),
+            Expires = DateTime.UtcNow.AddMinutes(5),
+            Issuer = issuer,
+            Audience = audience,
+            SigningCredentials = new SigningCredentials
+            (new SymmetricSecurityKey(key),
+            SecurityAlgorithms.HmacSha512Signature)
+        };
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        var jwtToken = tokenHandler.WriteToken(token);
+        var stringToken = tokenHandler.WriteToken(token);
+        return Results.Ok(stringToken);
+    }
+    return Results.Unauthorized();
+
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.Run();
+
