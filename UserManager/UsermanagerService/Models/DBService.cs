@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Reflection.PortableExecutable;
 using System.Security.Claims;
 using System.Text;
+using UsermanagerService.Exceptions;
 
 namespace UsermanagerService.Models
 {
@@ -47,17 +48,15 @@ namespace UsermanagerService.Models
 
                 reader.Close();
                 command.Dispose();
-                connection.Close();
-
-                if (users.Count == 1){ return users[0];}
-                else{return null;}
+               
+                if(users.Count != 0) {
+                    if (users.Count == 1) { return users[0]; }
+                    else { throw new MultipleInstanceException($"{users.Count}"); }
+                }
+                else{ throw new NoInstanceException(""); }
             }
-            catch (Exception)
-            {
-                command.Dispose();
-                connection.Close();
-                return null;
-            }
+            catch (SqlException) { throw new DatabaseException("Database Error"); }
+            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
         }
 
         /// <summary>
@@ -88,29 +87,18 @@ namespace UsermanagerService.Models
 
                 reader.Close();
                 command.Dispose();
-                connection.Close();
+               
 
-                if (users != null)
+                if (users.Count != 0)
                 {
-                    if (users.Count > 1) { throw new Exception("USERID not unique"); }
-                    else
-                    {
-                        return users[0];
-                    }
+                    if (users.Count > 1) { throw new MultipleInstanceException($"Found {users.Count} ID"); }
+                    else { return users[0]; }
                 }
-                else
-                {
-                    throw new Exception("User not found in database");
-                }
-            }catch(Exception ex)
-            {
-                if (ex is SqlException)
-                {
-                    throw (SqlException)ex;
-                }
-                else
-                { throw new Exception("Fail"); }
+                else { throw new NoInstanceException("No User found"); }
+
             }
+            catch (SqlException ex) { throw new DatabaseException(ex.Message); }
+            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
         }
 
         /// <summary>
@@ -141,7 +129,8 @@ namespace UsermanagerService.Models
                 //Implement SQL ROLLBACK
                 return false;
             }
-            
+            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
+
 
         }
 
@@ -153,11 +142,20 @@ namespace UsermanagerService.Models
         /// <returns>True if user added correctly</returns>
         public bool AddNewUser(User user, string password)
         {
+            bool result;
             SqlConnection connection = new SqlConnection(URL);
             List<int> ids = new List<int>();
             //Queries
-            string insertQuery = $"INSERT INTO user ({user.username}, {user.city}, {user.institute}, {user.role})";
-            string getIdQuery = $"SELECT id FROM user WHERE username = {user.username} city = {user.city} institute = {user.institute} role  = {user.role}";
+
+            string insertQuery = $"IF NOT EXIST " +
+                       $"SELECT * FROM user" +
+                       $"WHERE username = {user.username}" +
+                       $"BEGIN " +
+                       $"INSERT INTO user ({user.username}, {user.city}, {user.institute}, {user.role})" +
+                       $"END";
+
+            string getIdQuery = $"SELECT id FROM user" +
+                                $" WHERE username = {user.username} city = {user.city} institute = {user.institute} role  = {user.role}";
 
             //SQL Commands
             SqlCommand insertCommand = new SqlCommand(insertQuery, connection); //The command to insert user into user table
@@ -167,31 +165,34 @@ namespace UsermanagerService.Models
             try
             {
                 connection.Open();
+                if (insertCommand.ExecuteNonQuery() != 1)//execute insertion in user table
+                {
+                    throw new InsertionException("Insertion Failed");
+                }
 
-                insertCommand.ExecuteNonQuery(); //execute insertion in user table
-               
                 SqlDataReader reader = IdCommand.ExecuteReader(); //read from the user table   
 
-                while (reader.Read()){ ids.Add((int)reader[0]);}
+                while (reader.Read()) { ids.Add((int)reader[0]); }
 
                 reader.Close();
-
-                if (ids.Count != 1) { throw new Exception("Too many id"); }
-                else{ passwordCommand.ExecuteNonQuery(); } // Execute insertion in password table
-
                 IdCommand.Dispose();
                 insertCommand.Dispose();
                 passwordCommand.Dispose();
-                connection.Close();
-                
+
+                if (ids.Count != 1) { throw new MultipleInstanceException($"{ids.Count}"); }
+                else { passwordCommand.ExecuteNonQuery(); } // Execute insertion in password table
+
                 return true;
-            }catch
-            {
-                //Implement SQL ROLLBACK
-                connection.Close();
-                return false;
             }
+            catch (InsertionException ex) { return false; }
+            catch (SqlException ex) {
+
+                //ROLLBACK
+                throw new DatabaseException("DATABASE ERROR");
             
+            }
+            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
+
         }
         
         /// <summary>
@@ -199,30 +200,9 @@ namespace UsermanagerService.Models
         /// </summary>
         /// <param name="builder"></param>
         /// <returns>Token string</returns>
-        public string GenerateToken(WebApplicationBuilder builder)
+        public string GenerateToken()
         {
-            var issuer = builder.Configuration["Jwt:Issuer"];
-            var key = Encoding.ASCII.GetBytes
-            (builder.Configuration["Jwt:Key"]);
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(new[]
-                {
-                new Claim("Id", Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Jti,
-                Guid.NewGuid().ToString())
-             }),
-                Expires = DateTime.UtcNow.AddMinutes(30),
-                Issuer = issuer,
-                SigningCredentials = new SigningCredentials
-                (new SymmetricSecurityKey(key),
-                SecurityAlgorithms.HmacSha512Signature)
-            };
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            var jwtToken = tokenHandler.WriteToken(token);
-            var stringToken = tokenHandler.WriteToken(token);
-            return stringToken;
+            return "Temp Authentication token";
 
         }
 

@@ -5,6 +5,7 @@ using System.Text;
 using UsermanagerService.Models;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using UsermanagerService.Exceptions;
 
 var builder = WebApplication.CreateBuilder(args);
 var DB = new DBService("");
@@ -34,23 +35,19 @@ var app = builder.Build();
 
 app.MapGet("/login", [AllowAnonymous](string username, string password) =>
 {
+    
     try
     {
-        User? user = DB.ContainsCredentials(username, password);
-        if (user != null)
-        {
-            return JsonSerializer.Serialize(new Tuple<User, string>(user, DB.GenerateToken(builder)));
-            
-        }
-        else
-        {
-            return "false";
-        }
+        User user = DB.ContainsCredentials(username, password);
+        string token = DB.GenerateToken();
+        Tuple<User, string> tuple = new Tuple<User, string>(user, token);
+
+        return Results.Ok(JsonSerializer.Serialize(tuple));
+      
     }
-    catch
-    {
-       return "Unavailable";
-    }
+    catch (DatabaseException ex) { return Results.StatusCode(503); }
+    catch (MultipleInstanceException ex) { return Results.Problem($"Found {ex.Message} users"); }
+    catch (NoInstanceException) { return Results.Unauthorized(); }
     
 });
 
@@ -58,12 +55,11 @@ app.MapGet("/fetch", (int userID) =>
 {
     try
     {
-        return JsonSerializer.Serialize(DB.FetchUser(userID));
+        return Results.Ok(JsonSerializer.Serialize(DB.FetchUser(userID)));
     }
-    catch (Exception ex)
-    {
-        return ex.Message; 
-    }
+    catch (DatabaseException ex){ return Results.StatusCode(503); }//return serice unavailable
+    catch (MultipleInstanceException ex) { return Results.Problem(ex.Message); }
+    catch (NoInstanceException) { return Results.NotFound(false); }
 }).RequireAuthorization();
 
 app.MapGet("/verify", () =>
@@ -71,13 +67,22 @@ app.MapGet("/verify", () =>
     return true;
 }).RequireAuthorization();
 
-app.MapPost("/Create", [AllowAnonymous] (string username, string password, string city, string institue, string role) =>
+app.MapPut("/Create", [AllowAnonymous] (string username, string password, string city, string institue, string role) =>
 {
     User userObject = new User(0, username, city, institue, role);
-    if (DB.AddNewUser(userObject, password))
+    try
     {
-        return true;
-    }else { return false; }
+        if (DB.AddNewUser(userObject, password))
+        {
+            return Results.Ok(true);
+        }
+        else { return Results.Conflict("User could not be created"); }
+    }
+    catch (DatabaseException ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+   
 
 });
 
@@ -85,9 +90,9 @@ app.MapPost("/delete", (int userId) =>
 {
     if (DB.DeleteUser(userId))
     {
-        return true;
+        return Results.Ok(true);
     }
-    else{ return false; }
+    else{ return Results.NotFound(false); }
 });
 
 
