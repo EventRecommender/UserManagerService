@@ -1,4 +1,5 @@
 ﻿using Microsoft.IdentityModel.Tokens;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -13,71 +14,84 @@ namespace UsermanagerService.Models
 {
     public class DBService
     {
-        private string URL;
+        private SqlConnection connection;
 
         public DBService(string uRL)
         {
-            URL = uRL;
+            connection = new SqlConnection(uRL);
         }
 
+        
         /// <summary>
-        /// Checks if the username and password is a match in the database.
+        /// Fetches a user and password from the database
         /// </summary>
         /// <param name="username"></param>
+        /// <param name="user"></param>
         /// <param name="password"></param>
-        /// <returns>The user</returns>
-        public User? ContainsCredentials(string username, string password)
+        /// <exception cref="InstanceException"></exception>
+        /// <exception cref="DatabaseException"></exception>
+        public void FetchUserAndPasswordFromUsername(string username, out User user, out byte[] password)
         {
-            SqlConnection connection = new SqlConnection(URL);
-            List<User> users = new List<User>();
+            List<Tuple<User, byte[]>> FoundUsers = new List<Tuple<User, byte[]>>();
 
             //Query
-            string query = $"SELECT id username city institute role FROM user JOIN password WHERE username = {username} AND password ={password};";
-            
+            string query = $"SELECT * " +
+                           $"FROM user" +
+                           $" FULL OUTER JOIN password" +
+                           $"ON user.id = password.id" +
+                           $" WHERE username = {username};";
             //Command
-            SqlCommand command = new SqlCommand(query, connection);
+            SqlCommand command = new SqlCommand(query, this.connection);
+
             try
             {
                 connection.Open();
+                
                 SqlDataReader reader = command.ExecuteReader();
-
+                
                 while (reader.Read())
                 {
-                    users.Add(new User((int)reader[0], (string)reader[1], (string)reader[2], (string)reader[3], (string)reader[4]));
+                    User FoundUser = new User((int)reader[0], (string)reader[1], (string)reader[2], (string)reader[3], (string)reader[4]); //Creates user from retrieved rows
+                    byte[] FoundPas = (byte[])reader[5]; //Sets retrieved password hash
+
+                    FoundUsers.Add(new Tuple<User, byte[]>(FoundUser, FoundPas));
                 }
 
                 reader.Close();
-                command.Dispose();
-               
-                if(users.Count != 0) {
-                    if (users.Count == 1) { return users[0]; }
-                    else { throw new MultipleInstanceException($"{users.Count}"); }
+
+                if (FoundUsers.Count == 1)
+                {
+                    user = FoundUsers[0].Item1;
+                    password = FoundUsers[0].Item2;
+                    
                 }
-                else{ throw new NoInstanceException(""); }
+                else { throw new InstanceException($"{FoundUsers.Count}"); }
             }
             catch (SqlException) { throw new DatabaseException("Database Error"); }
-            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
-        }
+            finally { if (this.connection.State == ConnectionState.Open) { this.connection.Close(); } }
 
-        /// <summary>
-        /// Fetches a user from the database
-        /// </summary>
-        /// <param name="userId"></param>
-        /// <returns> A user object </returns>
-        /// <exception cref="Exception"></exception>
-        public User FetchUser (int userId)
+        }
+        
+
+       /// <summary>
+       /// Return a user from database.
+       /// </summary>
+       /// <param name="userId"></param>
+       /// <returns></returns>
+       /// <exception cref="InstanceException"></exception>
+       /// <exception cref="DatabaseException"></exception>
+        public User FetchUserFromID (int userId)
         {
-            SqlConnection connection = new SqlConnection(this.URL);
             List<User> users = new List<User>();
             //Query 
             string query = $"SELECT * from user WHERE id = {userId}";
 
             //SQL Command
-            SqlCommand command = new SqlCommand(query, connection);
+            SqlCommand command = new SqlCommand(query, this.connection);
 
             try
             {
-                connection.Open();
+                this.connection.Open();
                 SqlDataReader reader = command.ExecuteReader();
 
                 while (reader.Read())
@@ -89,37 +103,30 @@ namespace UsermanagerService.Models
                 command.Dispose();
                
 
-                if (users.Count != 0)
+                if (users.Count == 1)
                 {
-                    if (users.Count > 1) { throw new MultipleInstanceException($"Found {users.Count} ID"); }
-                    else { return users[0]; }
+                    return users[0]; 
                 }
-                else { throw new NoInstanceException("No User found"); }
+                else { throw new InstanceException($"{users.Count}"); }
 
             }
             catch (SqlException ex) { throw new DatabaseException(ex.Message); }
-            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
+            finally { if (this.connection.State == ConnectionState.Open) { this.connection.Close(); } }
         }
 
-        /// <summary>
-        /// Removes a user from the database
-        /// </summary>
-        /// <param name="userId"></param>
-        /// <returns>True is user successfully removed</returns>
+        
         public bool DeleteUser(int userId)
         {
-            SqlConnection connection = new SqlConnection(URL);
             //Queries
             string query1 = $"DELETE FROM user WHERE id = {userId};";
             string query2 = $"DELETE FROM password WHERE id = {userId};";
 
             //Commands
-            
-            SqlCommand delUsercommand = new SqlCommand(query1, connection);
-            SqlCommand delpasswordcommand = new SqlCommand(query2, connection);
+            SqlCommand delUsercommand = new SqlCommand(query1, this.connection);
+            SqlCommand delpasswordcommand = new SqlCommand(query2, this.connection);
             try
             {
-                connection.Open();
+                this.connection.Open();
                 delUsercommand.ExecuteNonQuery(); //delete the user from user table
                 delpasswordcommand.ExecuteNonQuery(); //delete the user from password table
                 return true;
@@ -129,83 +136,72 @@ namespace UsermanagerService.Models
                 //Implement SQL ROLLBACK
                 return false;
             }
-            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
+            finally { if (this.connection.State == ConnectionState.Open) { this.connection.Close(); } }
 
 
         }
 
-        /// <summary>
-        /// Adds a new user to the database.
-        /// </summary>
-        /// <param name="user"></param>
-        /// <param name="password"></param>
-        /// <returns>True if user added correctly</returns>
-        public bool AddNewUser(User user, string password)
+       /// <summary>
+       /// Adds a user to both user and password table.
+       /// </summary>
+       /// <param name="user"></param>
+       /// <param name="hashedPassword"></param>
+       /// <returns></returns>
+       /// <exception cref="DatabaseException"></exception>
+        public bool AddUser(UIntUser user, byte[] hashedPassword)
         {
-            bool result;
-            SqlConnection connection = new SqlConnection(URL);
-            List<int> ids = new List<int>();
-            //Queries
+            int id = -1;
 
+            //Queries
             string insertQuery = $"IF NOT EXIST " +
-                       $"SELECT * FROM user" +
-                       $"WHERE username = {user.username}" +
+                       $"SELECT * FROM user " +
+                       $"WHERE username = {user.Username} " +
                        $"BEGIN " +
-                       $"INSERT INTO user ({user.username}, {user.city}, {user.institute}, {user.role})" +
+                       $"INSERT INTO user ({user.Username}, {user.City}, {user.Institute}, {user.Role}) " +
                        $"END";
 
-            string getIdQuery = $"SELECT id FROM user" +
-                                $" WHERE username = {user.username} city = {user.city} institute = {user.institute} role  = {user.role}";
+            string getIdQuery = $"SELECT id FROM user " +
+                                $"WHERE username = {user.Username} city = {user.City} institute = {user.Institute} role  = {user.Role}";
 
             //SQL Commands
-            SqlCommand insertCommand = new SqlCommand(insertQuery, connection); //The command to insert user into user table
-            SqlCommand IdCommand = new SqlCommand(getIdQuery, connection); //The command to retrieve the id of the inserted user.
-            SqlCommand passwordCommand = new SqlCommand($"INSERT INTO password ({ids[0]},{password}", connection);
+            SqlCommand insertCommand = new SqlCommand(insertQuery, this.connection); //The command to insert user into user table
+            SqlCommand IdCommand = new SqlCommand(getIdQuery, this.connection); //The command to retrieve the id of the inserted user.
+            SqlCommand passwordCommand = new SqlCommand($"INSERT INTO password ({id},{hashedPassword}", this.connection);
 
             try
             {
-                connection.Open();
-                if (insertCommand.ExecuteNonQuery() != 1)//execute insertion in user table
-                {
-                    throw new InsertionException("Insertion Failed");
-                }
+                this.connection.Open();
+                int RowsEffected = insertCommand.ExecuteNonQuery(); //execute insertion in user table
+
+                if (RowsEffected != 1) { throw new InsertionException("Insertion Failed"); }
 
                 SqlDataReader reader = IdCommand.ExecuteReader(); //read from the user table   
 
-                while (reader.Read()) { ids.Add((int)reader[0]); }
-
+                while (reader.Read()) { id = (int)reader[0];  }
                 reader.Close();
-                IdCommand.Dispose();
-                insertCommand.Dispose();
-                passwordCommand.Dispose();
-
-                if (ids.Count != 1) { throw new MultipleInstanceException($"{ids.Count}"); }
-                else { passwordCommand.ExecuteNonQuery(); } // Execute insertion in password table
+                passwordCommand.ExecuteNonQuery(); // Execute insertion in password table
 
                 return true;
             }
-            catch (InsertionException ex) { return false; }
-            catch (SqlException ex) {
+            catch (InsertionException) { return false; }
+            catch (SqlException) {
 
                 //ROLLBACK
                 throw new DatabaseException("DATABASE ERROR");
-            
             }
-            finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
+            finally { 
+
+                if (this.connection.State == ConnectionState.Open) { this.connection.Close(); }
+                IdCommand.Dispose();
+                insertCommand.Dispose();
+                passwordCommand.Dispose();
+            }
 
         }
+
         
-        /// <summary>
-        /// Generates a JWT token
-        /// </summary>
-        /// <param name="builder"></param>
-        /// <returns>Token string</returns>
-        public string GenerateToken()
-        {
-            return "Temp Authentication token";
-
-        }
-
+        
+        
 
 
     }

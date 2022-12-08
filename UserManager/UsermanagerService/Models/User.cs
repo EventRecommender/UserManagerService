@@ -9,7 +9,6 @@
         public string role { get; }
        
 
-
         public User(int Id, string Username, string City, string Institute, string Role)
         {
             ID = Id;
