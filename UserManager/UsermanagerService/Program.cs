@@ -60,7 +60,7 @@ app.MapGet("/fetch", (int userID) =>
     catch (DatabaseException) { return Results.StatusCode(503); }//return serice unavailable
     catch (MultipleInstanceException ex) { return Results.Problem(ex.Message); }
     catch (NoInstanceException) { return Results.NotFound(false); }
-});.RequireAuthorization();
+}).RequireAuthorization();
 
 app.MapGet("/verify", () =>
 {

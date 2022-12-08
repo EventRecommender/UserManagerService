@@ -58,7 +58,7 @@ namespace UsermanagerService.Models
                 }
                 else { throw new NoInstanceException(""); }
             }
-            catch (MySqlException ex) { throw ex; }// newDatabaseException("Database Error"); }
+            catch (MySqlException) { throw new DatabaseException("Database Error"); }
             finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
         }
 
