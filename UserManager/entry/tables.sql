@@ -12,4 +12,5 @@ CREATE TABLE password(
     password VARCHAR(255) NOT NULL,
     PRIMARY KEY (userid),
     FOREIGN KEY (userid) REFERENCES user(id)
+    ON DELETE CASCADE
 );

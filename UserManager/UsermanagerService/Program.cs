@@ -45,7 +45,7 @@ app.MapGet("/login", [AllowAnonymous](string username, string password) =>
         return Results.Ok(JsonSerializer.Serialize(tuple));
       
     }
-    catch (DatabaseException ex) { return Results.StatusCode(503); }
+    catch (DatabaseException ex) {return Results.StatusCode(503); }
     catch (MultipleInstanceException ex) { return Results.Problem($"Found {ex.Message} users"); }
     catch (NoInstanceException) { return Results.Unauthorized(); }
     
@@ -57,10 +57,10 @@ app.MapGet("/fetch", (int userID) =>
     {
         return Results.Ok(JsonSerializer.Serialize(DB.FetchUser(userID)));
     }
-    catch (DatabaseException ex){ return Results.StatusCode(503); }//return serice unavailable
+    catch (DatabaseException) { return Results.StatusCode(503); }//return serice unavailable
     catch (MultipleInstanceException ex) { return Results.Problem(ex.Message); }
     catch (NoInstanceException) { return Results.NotFound(false); }
-}).RequireAuthorization();
+});.RequireAuthorization();
 
 app.MapGet("/verify", () =>
 {
@@ -86,11 +86,18 @@ app.MapPut("/Create", [AllowAnonymous] (string username, string password, string
 
 app.MapPost("/delete", (int userId) =>
 {
-    if (DB.DeleteUser(userId))
+    try
     {
-        return Results.Ok(true);
+        if (DB.DeleteUser(userId))
+        {
+            return Results.Ok(true);
+        }
+        else { return Results.NotFound(false); }
     }
-    else{ return Results.NotFound(false); }
+    catch (DatabaseException ex)
+    {
+        return Results.Problem(ex.Message);
+    }
 });
 
 

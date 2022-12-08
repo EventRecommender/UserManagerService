@@ -32,7 +32,10 @@ namespace UsermanagerService.Models
             List<User> users = new List<User>();
 
             //Query
-            string query = $"SELECT id username city institute role FROM user JOIN password WHERE username = {username} AND password ={password};";
+            string query = $"SELECT user.id, user.username, user.city, user.institute, user.role " +
+                           $"FROM user JOIN password " +
+                           $"ON user.id = password.userid " +
+                           $"WHERE username = '{username}' AND password = '{password}';";
             
             //Command
             MySqlCommand command = new MySqlCommand(query, connection);
@@ -48,14 +51,14 @@ namespace UsermanagerService.Models
 
                 reader.Close();
                 command.Dispose();
-               
-                if(users.Count != 0) {
+
+                if (users.Count != 0) {
                     if (users.Count == 1) { return users[0]; }
                     else { throw new MultipleInstanceException($"{users.Count}"); }
                 }
-                else{ throw new NoInstanceException(""); }
+                else { throw new NoInstanceException(""); }
             }
-            catch (MySqlException) { throw new DatabaseException("Database Error"); }
+            catch (MySqlException ex) { throw ex; }// newDatabaseException("Database Error"); }
             finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
         }
 
@@ -70,7 +73,7 @@ namespace UsermanagerService.Models
             MySqlConnection connection = new MySqlConnection(this.URL);
             List<User> users = new List<User>();
             //Query 
-            string query = $"SELECT * from user WHERE id = {userId}";
+            string query = $"SELECT * FROM user WHERE id = {userId}";
 
             //SQL Command
             MySqlCommand command = new MySqlCommand(query, connection);
@@ -109,25 +112,24 @@ namespace UsermanagerService.Models
         public bool DeleteUser(int userId)
         {
             MySqlConnection connection = new MySqlConnection(URL);
-            //Queries
-            string query1 = $"DELETE FROM user WHERE id = {userId};";
-            string query2 = $"DELETE FROM password WHERE id = {userId};";
+            //Queries (password is deleted in the cascade)
+            string query1 = $"DELETE FROM user WHERE id = '{userId}';";
 
-            //Commands
-            
+            //Command
             MySqlCommand delUsercommand = new MySqlCommand(query1, connection);
-            MySqlCommand delpasswordcommand = new MySqlCommand(query2, connection);
             try
             {
                 connection.Open();
-                delUsercommand.ExecuteNonQuery(); //delete the user from user table
-                delpasswordcommand.ExecuteNonQuery(); //delete the user from password table
+                int affected = delUsercommand.ExecuteNonQuery(); //delete the user from user table
+                if (affected == 0)
+                    return false;
+           
                 return true;
             }
-            catch {
+            catch (MySqlException){
 
                 //Implement SQL ROLLBACK
-                return false;
+                throw new DatabaseException("DATABASE ERROR");
             }
             finally { if (connection.State == ConnectionState.Open) { connection.Close(); } }
 
@@ -154,15 +156,6 @@ namespace UsermanagerService.Models
                                 $"SELECT username FROM user WHERE username = '{user.username}' " +      
                                 $") LIMIT 1;";  
 
-            /*
-
-            string insertQuery = $"IF NOT EXISTS ( " +
-                       $"SELECT * FROM user " +
-                       $"WHERE username = '{user.username}' );" +
-                       $"BEGIN " +
-                       $"INSERT INTO user ('{user.username}', '{user.city}', '{user.institute}', '{user.role}') " +
-                       $"END";
-            */
             string getIdQuery = $"SELECT id FROM user " +
                                 $"WHERE username = '{user.username}' AND city = '{user.city}' AND institute = '{user.institute}' AND role  = '{user.role}'";
 
