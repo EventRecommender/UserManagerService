@@ -2,48 +2,77 @@
 This is an microservice responsible for handling users in the [EventRecommender application](https://github.com/EventRecommender).
 
 ## Contents
-
-- [Endpoints](#endpoints)
+#### [Endpoints](#endpoints)
+- Login
+- Fetch
+- Verify
+- Create
+- Delete
 
 # Endpoints
 
-## /Login
-### Description:
-Checks if the username and password exists in the database. 
+## Login
+Checks if the username exists in the database, and the password is correct. 
 
-### Input:
-\<string\> Username - username of the user.\
-\<string\> password - the input password, hashed and salted.
+### Input
+\<string\> Username \
+\<string\> password 
 
-### Returns:
-A tuple with the user and a token is returned, if the user exists and password is correct.\
-If incorret, a string with "false" is returned. 
+### Returns
+An object containing _UserID_, _Username_, _Role_ and _JWT_.
+
+```
+  "Id": <int>,
+  "Username": <string>,
+  "Role": <string>,
+  "Token": <string>
+```
 
 ## /fetch
-### Description:
 Retrieves a user from the database.
 
-### Input:
-\<Int\> userID - The id of the user to be retrieved
+### Input
+\<Int\> userID
 
-### Returns:
-A json object containing the user, if the user exists.\
-if user does not exist, an error message is returned. ("Not unique id", or "unavailable")
+### Returns
+if user does not exist, an error message is returned. ("Not unique id", or "unavailable")\
+
+else a user object is returned.
+
+```
+  "ID": <Int>,
+  "username": <string>,
+  "city": <string>
+  "institute": <string>,
+  "role": <string>
+```
 
 ## /verify
-### Description:
-checks if the user has a token.
-### Returns:
-A true value if the user is authorized.\
-If not authorized, the user does not have access to this endpoint.
+checks if the request contains a valid token.
+
+### Returns
+true if the request contains a valid JWT in the authorization header.\
+false if the request does not contain a valid JWT in the authorization header.
 
 ## /create
-### Description:
 Creates a new user in the database.
 
-### Input:
+### Input
 \<string\> username - The wanted username\
 \<string\> password - The wanted password, hashed and salted.\
 \<string\> city - The city which the user is interested in.\
 \<string\> institute - The institute which the user is connected to.\
 \<string\> role - the requested role of the user\
+
+### Returns
+true if the user has successfully been added to the database.
+
+## /delete
+Removes a user from the database
+
+### Input
+<int> userID
+
+### Returns
+true if user is successfully removed.
+false if an error has occured during the deletion process.
