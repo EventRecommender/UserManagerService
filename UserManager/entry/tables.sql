@@ -1,5 +1,5 @@
 CREATE TABLE user(
-    id INT NOT NULL,
+    id INT NOT NULL AUTO_INCREMENT,
     username VARCHAR(255) NOT NULL,
     city VARCHAR(255) NOT NULL,
     institute VARCHAR(255) NOT NULL,

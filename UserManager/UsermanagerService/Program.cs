@@ -8,7 +8,7 @@ using System.Text.Json.Nodes;
 using UsermanagerService.Exceptions;
 
 var builder = WebApplication.CreateBuilder(args);
-var DB = new DBService("");
+var DB = new DBService(@"server=usermanager_database;userid=root;password=fuper;database=usermanager_db");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -82,8 +82,6 @@ app.MapPut("/Create", [AllowAnonymous] (string username, string password, string
     {
         return Results.Problem(ex.Message);
     }
-   
-
 });
 
 app.MapPost("/delete", (int userId) =>
