@@ -13,7 +13,7 @@ namespace UsermanagerService.Models
         DBService dBService = new DBService("");
        
 
-        public User Login(string username, byte[] Inputpassword)
+        public User? Login(string username, byte[] Inputpassword)
         {
             try
             {
@@ -63,7 +63,7 @@ namespace UsermanagerService.Models
                 new Claim(JwtRegisteredClaimNames.Jti,
                 Guid.NewGuid().ToString())
              }),
-                Expires = DateTime.UtcNow.AddMinutes(10),
+                Expires = DateTime.UtcNow.AddMinutes(1),
                 Issuer = issuer,
                 Audience = audience,
                 SigningCredentials = new SigningCredentials
@@ -73,28 +73,35 @@ namespace UsermanagerService.Models
             var tokenHandler = new JwtSecurityTokenHandler();
             var token = tokenHandler.CreateToken(tokenDescriptor);
             var jwtToken = tokenHandler.WriteToken(token);
-
+            
             return jwtToken;
 
+        }
 
+        public bool isTokenValid(string token, byte[] key, string issuer, string audience)
+        {
+            if(token == null) return false;
 
-            /*
-            List<Claim> claims = new List<Claim> { new Claim(ClaimTypes.Name, user.username) };
+            var TokenHandler = new JwtSecurityTokenHandler();
 
-            var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(
-                _configuration.GetSection("JWT:Token").Value));
+            try
+            {
+                TokenHandler.ValidateToken(token, new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidAudience = audience,
+                    ValidIssuer = issuer,
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ClockSkew = TimeSpan.Zero
+                }, out SecurityToken validatedToken); ;
 
-            var cred = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
+                var jwToken = (JwtSecurityToken)validatedToken;
 
-            var token = new JwtSecurityToken(
-                claims: claims,
-                expires: DateTime.Now.AddHours(1),
-                signingCredentials: cred);
-
-            var jwt = new JwtSecurityTokenHandler().WriteToken(token);
-            return jwt; */
-
-
+                return true;
+            } catch (Exception) { return false; }
+            
         }
     }
 }
