@@ -35,43 +35,47 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-
 var app = builder.Build();
 
-app.MapPost("/login", (string username, byte[] password) =>
-{    
+app.MapPost("/login", [AllowAnonymous] (string username, byte[] password) =>
+{
+    string issuer = builder.Configuration["JWT:Issuer"];
+    string audience = builder.Configuration["JWT:Audience"];
+    byte[] key = Encoding.ASCII.GetBytes
+    (builder.Configuration["JWT:Key"]);
+
     try
     {
-        var login = auth.Login(username, password);
+        User? user = auth.Login(username, password);
         
-        if (login == null) { return Results.Unauthorized(); }
+        if (user == null) { return Results.Unauthorized(); }
 
-        return Results.Accepted(JsonSerializer.Serialize(login));
+        string token = auth.GenerateToken(username, issuer, audience, key);
+
+        UserAuth userAuth = new UserAuth(user.ID, user.username, user.role, token);
+
+        return Results.Accepted(JsonSerializer.Serialize(userAuth));
 
     }
-    catch (DatabaseException ex) { return Results.StatusCode(503); }
+    catch (DatabaseException) { return Results.StatusCode(503); }
     catch (Exception ex) { return Results.Problem(detail:ex.Message); }
-    
     
 });
 
-app.MapGet("/fetch", (int userID) =>
+app.MapGet("/fetch", [Authorize] (int userID) =>
 { 
     try
     {
         User user = dBService.FetchUserFromID(userID);
         return Results.Accepted(JsonSerializer.Serialize(user));
     }
-    catch (DatabaseException ex) { return Results.StatusCode(503); }//return serice unavailable
+    catch (DatabaseException ) { return Results.StatusCode(503); }//return serice unavailable
     catch (InstanceException ex) { return Results.Problem(detail: $"Found {ex.Message} users"); }
 });
 
-app.MapGet("/verify", (string token) =>
-{
-    return true;
-});
+app.MapGet("/verify", [Authorize] (string token) => { return Results.Accepted(); });
 
-app.MapPut("/Create", (string username, byte[] password, string city, string institue, string role) =>
+app.MapPut("/Create", [AllowAnonymous] (string username, byte[] password, string city, string institue, string role) =>
 {
     UIntUser UnitializedUser = new UIntUser(username, city, institue, role);
 
@@ -86,7 +90,7 @@ app.MapPut("/Create", (string username, byte[] password, string city, string ins
     }
 });
 
-app.MapPost("/delete", (int userId) =>
+app.MapPost("/delete", [Authorize] (int userId) =>
 {
     if (dBService.DeleteUser(userId))
     {
@@ -95,7 +99,7 @@ app.MapPost("/delete", (int userId) =>
     else{ return Results.NotFound(false); }
 });
 
-app.MapPost("/CreateToken", (string username, string password) =>
+app.MapGet("/CreateToken", (string username, string password) =>
 {
 
     if (username == "Test" && password == "test123")
@@ -104,32 +108,15 @@ app.MapPost("/CreateToken", (string username, string password) =>
         var audience = builder.Configuration["JWT:Audience"];
         var key = Encoding.ASCII.GetBytes
         (builder.Configuration["JWT:Key"]);
-        var tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(new[]
-            {
-                new Claim("Id", Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Sub, username),
-                new Claim(JwtRegisteredClaimNames.Email, username),
-                new Claim(JwtRegisteredClaimNames.Jti,
-                Guid.NewGuid().ToString())
-             }),
-            Expires = DateTime.UtcNow.AddMinutes(5),
-            Issuer = issuer,
-            Audience = audience,
-            SigningCredentials = new SigningCredentials
-            (new SymmetricSecurityKey(key),
-            SecurityAlgorithms.HmacSha512Signature)
-        };
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        var jwtToken = tokenHandler.WriteToken(token);
-        var stringToken = tokenHandler.WriteToken(token);
-        return Results.Ok(stringToken);
+
+        var token = auth.GenerateToken(username, issuer, audience, key);
+       
+        return Results.Ok(token);
     }
     return Results.Unauthorized();
 
 });
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.Run();

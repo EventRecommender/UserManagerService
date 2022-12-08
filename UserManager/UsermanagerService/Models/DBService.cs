@@ -14,7 +14,6 @@ namespace UsermanagerService.Models
 {
     public class DBService
     {
-        private string URL;
         private SqlConnection connection;
 
         public DBService(string uRL)
@@ -184,8 +183,8 @@ namespace UsermanagerService.Models
 
                 return true;
             }
-            catch (InsertionException ex) { return false; }
-            catch (SqlException ex) {
+            catch (InsertionException) { return false; }
+            catch (SqlException) {
 
                 //ROLLBACK
                 throw new DatabaseException("DATABASE ERROR");

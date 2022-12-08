@@ -11,31 +11,25 @@ namespace UsermanagerService.Models
     public class Authenticator
     {
         DBService dBService = new DBService("");
-        private readonly IConfiguration _configuration;
-        public Authenticator(IConfiguration configuration)
-        {
-        _configuration = configuration;
-        }
+       
 
-        public Tuple<User, string> Login (string username, byte[] Inputpassword)
+        public User Login(string username, byte[] Inputpassword)
         {
             try
             {
                 dBService.FetchUserAndPasswordFromUsername(username, out User user, out byte[] password);
 
-                if(Inputpassword == password)
+                if (Inputpassword == password)
                 {
-                    return new Tuple<User, string>(user, GenerateToken(user));
+                    return user;
                 }
                 else { return null; }
-                
+
             }
-            catch (NoInstanceException) { throw new Exception("User not found"); }
-            catch (MultipleInstanceException) { throw new Exception("Multiple users found"); } //This should never happen
+            catch (InstanceException) { throw new Exception("0"); }
+
 
         }
-
-
 
         public void CreatePasswordHash(string password, out byte[] Hash, out byte[] Salt)
         {
@@ -54,11 +48,37 @@ namespace UsermanagerService.Models
             {
                 return hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
             }
-
         }
 
-        public string GenerateToken(User user)
+        public string GenerateToken(string username, string issuer, string audience, byte[] key)
         {
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new[]
+            {
+                new Claim("Id", Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Sub, username),
+                new Claim(JwtRegisteredClaimNames.Email, username),
+                new Claim(JwtRegisteredClaimNames.Jti,
+                Guid.NewGuid().ToString())
+             }),
+                Expires = DateTime.UtcNow.AddMinutes(10),
+                Issuer = issuer,
+                Audience = audience,
+                SigningCredentials = new SigningCredentials
+            (new SymmetricSecurityKey(key),
+            SecurityAlgorithms.HmacSha512Signature)
+            };
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            var jwtToken = tokenHandler.WriteToken(token);
+
+            return jwtToken;
+
+
+
+            /*
             List<Claim> claims = new List<Claim> { new Claim(ClaimTypes.Name, user.username) };
 
             var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(
@@ -72,6 +92,9 @@ namespace UsermanagerService.Models
                 signingCredentials: cred);
 
             var jwt = new JwtSecurityTokenHandler().WriteToken(token);
-            return jwt;
+            return jwt; */
+
+
         }
+    }
 }

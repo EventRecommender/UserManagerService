@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Jguld\\Desktop\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj": {}
+    "D:\\Code\\P7\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Jguld\\Desktop\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj": {
+    "D:\\Code\\P7\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Jguld\\Desktop\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
+        "projectUniqueName": "D:\\Code\\P7\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
         "projectName": "UsermanagerService",
-        "projectPath": "C:\\Users\\Jguld\\Desktop\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
+        "projectPath": "D:\\Code\\P7\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
         "packagesPath": "C:\\Users\\Jguld\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Jguld\\Desktop\\UserManagerService\\UserManager\\UsermanagerService\\obj\\",
+        "outputPath": "D:\\Code\\P7\\UserManagerService\\UserManager\\UsermanagerService\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Jguld\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -47,6 +47,10 @@
             "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": {
               "target": "Package",
               "version": "[1.17.0, )"
+            },
+            "MySql.Data": {
+              "target": "Package",
+              "version": "[8.0.31, )"
             },
             "System.Data.SqlClient": {
               "target": "Package",
