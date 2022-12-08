@@ -8,6 +8,8 @@ using System.Text.Json.Nodes;
 using UsermanagerService.Exceptions;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Org.BouncyCastle.Asn1.Ocsp;
+using Org.BouncyCastle.Ocsp;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 var dBService = new DBService("");
@@ -73,7 +75,19 @@ app.MapGet("/fetch", [Authorize] (int userID) =>
     catch (InstanceException ex) { return Results.Problem(detail: $"Found {ex.Message} users"); }
 });
 
-app.MapGet("/verify", [Authorize] (string token) => { return Results.Accepted(); });
+app.MapGet("/verify", [Authorize] (HttpRequest req) => {
+
+    string inputToken = req.Headers.Authorization.ToString().Split(" ")[1];
+    byte[] key = Encoding.ASCII.GetBytes
+    (builder.Configuration["JWT:Key"]);
+    string issuer = builder.Configuration["JWT:Issuer"];
+    string audience = builder.Configuration["JWT:Audience"];
+
+    if (auth.isTokenValid(inputToken, key, issuer, audience)) { return Results.Accepted(value: true); }
+
+    return Results.BadRequest(false);
+
+}).RequireAuthorization();
 
 app.MapPut("/Create", [AllowAnonymous] (string username, byte[] password, string city, string institue, string role) =>
 {
@@ -90,7 +104,7 @@ app.MapPut("/Create", [AllowAnonymous] (string username, byte[] password, string
     }
 });
 
-app.MapPost("/delete", [Authorize] (int userId) =>
+app.MapGet("/delete", [Authorize] (int userId) =>
 {
     if (dBService.DeleteUser(userId))
     {
@@ -99,9 +113,9 @@ app.MapPost("/delete", [Authorize] (int userId) =>
     else{ return Results.NotFound(false); }
 });
 
-app.MapGet("/CreateToken", (string username, string password) =>
+app.MapPost("/CreateToken", (string username, string password) =>
 {
-
+ 
     if (username == "Test" && password == "test123")
     {
         var issuer = builder.Configuration["JWT:Issuer"];
@@ -110,7 +124,7 @@ app.MapGet("/CreateToken", (string username, string password) =>
         (builder.Configuration["JWT:Key"]);
 
         var token = auth.GenerateToken(username, issuer, audience, key);
-       
+        
         return Results.Ok(token);
     }
     return Results.Unauthorized();
