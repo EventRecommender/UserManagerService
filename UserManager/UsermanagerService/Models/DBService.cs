@@ -203,5 +203,30 @@ namespace UsermanagerService.Models
                              
             }
         }
+
+        public List<User> FetchAllUsers()
+        {
+            List<User> users = new List<User>();
+                    
+            //Command
+            MySqlCommand Fetch = new MySqlCommand("SELECT * FROM user", this.connection);
+            try
+            {
+                this.connection.Open();
+                MySqlDataReader reader = Fetch.ExecuteReader();
+
+                while (reader.Read()) { 
+                    users.Add(new User((int)reader[0], (string)reader[1], (string)reader[2], (string)reader[3], (string)reader[4]));
+                }
+
+                return users;
+            }catch(MySqlException ex)
+            {
+                throw new DatabaseException(ex.Message);
+            }
+            finally {
+                if (this.connection.State == ConnectionState.Open) { this.connection.Close(); }
+            }
+        }
     }
 }

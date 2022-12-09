@@ -127,6 +127,21 @@ app.MapPost("/CreateToken", (LoginInput login) =>
 
 });
 
+app.MapGet("/FetchAllUsers", [Authorize]() =>
+{
+    try
+    {
+        List<User> users = dBService.FetchAllUsers();
+
+        return Results.Ok(JsonSerializer.Serialize(users));
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+    
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.Run();
