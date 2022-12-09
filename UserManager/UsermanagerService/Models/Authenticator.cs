@@ -10,20 +10,25 @@ namespace UsermanagerService.Models
 {
     public class Authenticator
     {
-        DBService dBService = new DBService("");
+        public Authenticator(DBService database)
+        {
+            DBService = database;
+        }
+
+        DBService DBService;
        
-        public User? Login(string username, byte[] Inputpassword)
+        public User? Login(string username, string Inputpassword)
         {
             try
             {
-                dBService.FetchUserAndPasswordFromUsername(username, out User user, out byte[] password);
+                DBService.FetchUserAndPasswordFromUsername(username, out User user, out string password);
 
                 if (Inputpassword == password)
                 {
                     return user;
                 }
                 else { return null; }
-
+                 
             }
             catch (InstanceException) { throw new Exception("0"); }
         }

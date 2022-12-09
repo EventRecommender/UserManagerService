@@ -29,15 +29,15 @@ namespace UsermanagerService.Models
         /// <param name="password"></param>
         /// <exception cref="InstanceException"></exception>
         /// <exception cref="DatabaseException"></exception>
-        public void FetchUserAndPasswordFromUsername(string username, out User user, out byte[] password)
+        public void FetchUserAndPasswordFromUsername(string username, out User user, out string password)
         {
-            List<Tuple<User, byte[]>> FoundUsers = new List<Tuple<User, byte[]>>();
+            List<Tuple<User, string>> FoundUsers = new List<Tuple<User, string>>();
 
             //Query
-            string query = $"SELECT user.id, user.username, user.city, user.institute, user.role " +
+            string query = $"SELECT user.id, user.username, user.city, user.institute, user.role, password.password " +
                            $"FROM user JOIN password " +
                            $"ON user.id = password.userid " +
-                           $"WHERE username = '{username}' AND password = '{password}';";
+                           $"WHERE username = '{username}';";
             
             //Command
             MySqlCommand command = new MySqlCommand(query, this.connection);
@@ -49,9 +49,9 @@ namespace UsermanagerService.Models
                 while (reader.Read())
                 {
                     User FoundUser = new User((int)reader[0], (string)reader[1], (string)reader[2], (string)reader[3], (string)reader[4]); //Creates user from retrieved rows
-                    byte[] FoundPas = (byte[])reader[5]; //Sets retrieved password hash
+                    string FoundPas = (string)reader[5]; //Sets retrieved password hash
 
-                    FoundUsers.Add(new Tuple<User, byte[]>(FoundUser, FoundPas));
+                    FoundUsers.Add(new Tuple<User, string>(FoundUser, FoundPas));
                 }
 
                 reader.Close();
@@ -141,7 +141,7 @@ namespace UsermanagerService.Models
         /// <param name="hashedPassword"></param>
         /// <returns></returns>
         /// <exception cref="DatabaseException"></exception>
-        public bool AddUser(UIntUser user, byte[] hashedPassword)
+        public bool AddUser(UIntUser user, string hashedPassword)
         {
             int id = -1;
             //Queries

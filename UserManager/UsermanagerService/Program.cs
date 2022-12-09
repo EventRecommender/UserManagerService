@@ -13,7 +13,7 @@ using Org.BouncyCastle.Ocsp;
 
 var builder = WebApplication.CreateBuilder(args);
 var dBService = new DBService(@"server=usermanager_database;userid=root;password=fuper;database=usermanager_db");
-Authenticator auth = new Authenticator();
+Authenticator auth = new Authenticator(dBService);
 
 
 builder.Services.AddAuthentication(options =>
@@ -40,7 +40,7 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-app.MapPost("/login", [AllowAnonymous] (string username, byte[] password) =>
+app.MapPost("/login", [AllowAnonymous] (string username,string password) =>
 {
     string issuer = builder.Configuration["JWT:Issuer"];
     string audience = builder.Configuration["JWT:Audience"];
@@ -57,7 +57,7 @@ app.MapPost("/login", [AllowAnonymous] (string username, byte[] password) =>
 
         UserAuth userAuth = new UserAuth(user.ID, user.username, user.role, token);
 
-        return Results.Accepted(JsonSerializer.Serialize(userAuth));
+        return Results.Ok(JsonSerializer.Serialize(userAuth));
 
     }
     catch (DatabaseException) { return Results.StatusCode(503); }
@@ -90,7 +90,7 @@ app.MapGet("/verify", [Authorize] (HttpRequest req) => {
 
 }).RequireAuthorization();
 
-app.MapPut("/Create", [AllowAnonymous] (string username, byte[] password, string city, string institue, string role) =>
+app.MapPut("/Create", [AllowAnonymous] (string username, string password, string city, string institue, string role) =>
 {
     UIntUser UnitializedUser = new UIntUser(username, city, institue, role);
 
