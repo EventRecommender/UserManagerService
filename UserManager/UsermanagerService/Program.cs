@@ -69,7 +69,7 @@ app.MapGet("/fetch", [Authorize] (int userID) =>
     try
     {
         User user = dBService.FetchUserFromID(userID);
-        return Results.Accepted(JsonSerializer.Serialize(user));
+        return Results.Ok(JsonSerializer.Serialize(user));
     }
     catch (DatabaseException ) { return Results.StatusCode(503); }//return serice unavailable
     catch (InstanceException ex) { return Results.Problem(detail: $"Found {ex.Message} users"); }
