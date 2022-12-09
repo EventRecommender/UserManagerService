@@ -13,8 +13,11 @@ using Org.BouncyCastle.Ocsp;
 
 var builder = WebApplication.CreateBuilder(args);
 var dBService = new DBService(@"server=usermanager_database;userid=root;password=fuper;database=usermanager_db");
-Authenticator auth = new Authenticator(dBService);
-
+string issuer = builder.Configuration["JWT:Issuer"];
+string audience = builder.Configuration["JWT:Audience"];
+byte[] key = Encoding.ASCII.GetBytes
+(builder.Configuration["JWT:Key"]);
+Authenticator auth = new Authenticator(dBService,issuer, audience, key);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -42,10 +45,7 @@ var app = builder.Build();
 
 app.MapPost("/login", [AllowAnonymous] (LoginInput input) =>
 {
-    string issuer = builder.Configuration["JWT:Issuer"];
-    string audience = builder.Configuration["JWT:Audience"];
-    byte[] key = Encoding.ASCII.GetBytes
-    (builder.Configuration["JWT:Key"]);
+    
 
     try
     {
@@ -53,7 +53,7 @@ app.MapPost("/login", [AllowAnonymous] (LoginInput input) =>
         
         if (user == null) { return Results.Unauthorized(); }
 
-        string token = auth.GenerateToken(user.username, issuer, audience, key);
+        string token = auth.GenerateToken(user.username);
 
         UserAuth userAuth = new UserAuth(user.ID, user.username, user.role, token);
 
@@ -78,12 +78,8 @@ app.MapGet("/fetch", [Authorize] (int userID) =>
 app.MapGet("/verify", [Authorize] (HttpRequest req) => {
 
     string inputToken = req.Headers.Authorization.ToString().Split(" ")[1];
-    byte[] key = Encoding.ASCII.GetBytes
-    (builder.Configuration["JWT:Key"]);
-    string issuer = builder.Configuration["JWT:Issuer"];
-    string audience = builder.Configuration["JWT:Audience"];
 
-    if (auth.isTokenValid(inputToken, key, issuer, audience)) { return Results.Ok(value: true); }
+    if (auth.isTokenValid(inputToken)) { return Results.Ok(value: true); }
 
     return Results.BadRequest(false);
 
@@ -123,12 +119,7 @@ app.MapPost("/CreateToken", (LoginInput login) =>
 {
     if (login.Username == "Test" && login.Password == "test123")
     {
-        var issuer = builder.Configuration["JWT:Issuer"];
-        var audience = builder.Configuration["JWT:Audience"];
-        var key = Encoding.ASCII.GetBytes
-        (builder.Configuration["JWT:Key"]);
-
-        var token = auth.GenerateToken(login.Username, issuer, audience, key);
+        var token = auth.GenerateToken(login.Username);
         
         return Results.Ok(token);
     }
