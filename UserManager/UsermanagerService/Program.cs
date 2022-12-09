@@ -84,7 +84,7 @@ app.MapGet("/verify", [Authorize] (HttpRequest req) => {
     string issuer = builder.Configuration["JWT:Issuer"];
     string audience = builder.Configuration["JWT:Audience"];
 
-    if (auth.isTokenValid(inputToken, key, issuer, audience)) { return Results.Accepted(value: true); }
+    if (auth.isTokenValid(inputToken, key, issuer, audience)) { return Results.Ok(value: true); }
 
     return Results.BadRequest(false);
 
