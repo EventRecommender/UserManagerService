@@ -1,5 +1,6 @@
 # UserMangerService
 This is an microservice responsible for handling users in the [EventRecommender application](https://github.com/EventRecommender).
+This service is responsible for creating and valdidating Json Web Tokens (JWT).
 
 ## Contents
 #### [Endpoints](#endpoints)
@@ -8,6 +9,7 @@ This is an microservice responsible for handling users in the [EventRecommender 
 - Verify
 - Create
 - Delete
+- FetchAllUsers
 
 # Endpoints
 
@@ -76,3 +78,11 @@ Removes a user from the database
 ### Returns
 true if user is successfully removed.
 false if an error has occured during the deletion process.
+
+## /FetchAllUsers
+Retrieves all users stored on the database. Requires a valid JWT.
+
+### Returns 
+A list of users.
+
+
