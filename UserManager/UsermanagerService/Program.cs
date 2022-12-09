@@ -91,7 +91,7 @@ app.MapPut("/Create", [AllowAnonymous] (UIntUser UnitializedUser) =>
     try
     {
         if (dBService.AddUser(UnitializedUser)){ return Results.Ok(true); }
-        else { return Results.Conflict("User could not be created"); }
+        else { return Results.Conflict("User already exist"); }
     }
     catch (DatabaseException ex)
     {
