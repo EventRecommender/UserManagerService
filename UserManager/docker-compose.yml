@@ -4,13 +4,11 @@ services:
     build: .
     container_name: usermanager-service
     ports:
-      - 80:80
+      - 8003:80
 
   mysql:
     image: mysql
     container_name: usermanager_database
-    ports:
-      - 3306:3306
     environment:
       MYSQL_ROOT_PASSWORD: fuper
       MYSQL_DATABASE: usermanager_db
