@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "G14Jf7+2ceIewj0MrYX6xFJVr05JWWaDVUTPPZ20CvUGeBwZWOalcqfGfvEZKO1gr6gJkrJemXOuuep/0V9PtA==",
+  "dgSpecHash": "Gr4gKQiZmmbudBz0HVFdWGgZIYdROsR/Et0NjsXXjNcqo2FawUHN++Pn2DfTkt8i6bW+2gxmb94Yx7p28amsPA==",
   "success": true,
-  "projectFilePath": "D:\\Code\\P7\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
+  "projectFilePath": "C:\\Users\\Jguld\\Desktop\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Jguld\\.nuget\\packages\\google.protobuf\\3.19.4\\google.protobuf.3.19.4.nupkg.sha512",
     "C:\\Users\\Jguld\\.nuget\\packages\\k4os.compression.lz4\\1.2.6\\k4os.compression.lz4.1.2.6.nupkg.sha512",

@@ -40,7 +40,7 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-app.MapPost("/login", [AllowAnonymous] (string username,string password) =>
+app.MapPost("/login", [AllowAnonymous] (LoginInput input) =>
 {
     string issuer = builder.Configuration["JWT:Issuer"];
     string audience = builder.Configuration["JWT:Audience"];
@@ -49,16 +49,15 @@ app.MapPost("/login", [AllowAnonymous] (string username,string password) =>
 
     try
     {
-        User? user = auth.Login(username, password);
+        User? user = auth.Login(input.Username, input.Password);
         
         if (user == null) { return Results.Unauthorized(); }
 
-        string token = auth.GenerateToken(username, issuer, audience, key);
+        string token = auth.GenerateToken(user.username, issuer, audience, key);
 
         UserAuth userAuth = new UserAuth(user.ID, user.username, user.role, token);
 
         return Results.Ok(JsonSerializer.Serialize(userAuth));
-
     }
     catch (DatabaseException) { return Results.StatusCode(503); }
     catch (Exception ex) { return Results.Problem(detail:ex.Message); }
@@ -90,13 +89,12 @@ app.MapGet("/verify", [Authorize] (HttpRequest req) => {
 
 }).RequireAuthorization();
 
-app.MapPut("/Create", [AllowAnonymous] (string username, string password, string city, string institue, string role) =>
+app.MapPut("/Create", [AllowAnonymous] (UIntUser UnitializedUser) =>
 {
-    UIntUser UnitializedUser = new UIntUser(username, city, institue, role);
-
+   
     try
     {
-        if (dBService.AddUser(UnitializedUser, password)){ return Results.Ok(true); }
+        if (dBService.AddUser(UnitializedUser)){ return Results.Ok(true); }
         else { return Results.Conflict("User could not be created"); }
     }
     catch (DatabaseException ex)
@@ -121,17 +119,16 @@ app.MapGet("/delete", [Authorize] (int userId) =>
     }
 });
 
-app.MapPost("/CreateToken", (string username, string password) =>
+app.MapPost("/CreateToken", (LoginInput login) =>
 {
- 
-    if (username == "Test" && password == "test123")
+    if (login.Username == "Test" && login.Password == "test123")
     {
         var issuer = builder.Configuration["JWT:Issuer"];
         var audience = builder.Configuration["JWT:Audience"];
         var key = Encoding.ASCII.GetBytes
         (builder.Configuration["JWT:Key"]);
 
-        var token = auth.GenerateToken(username, issuer, audience, key);
+        var token = auth.GenerateToken(login.Username, issuer, audience, key);
         
         return Results.Ok(token);
     }

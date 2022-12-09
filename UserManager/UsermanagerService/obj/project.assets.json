@@ -1677,11 +1677,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Code\\P7\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
+      "projectUniqueName": "C:\\Users\\Jguld\\Desktop\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
       "projectName": "UsermanagerService",
-      "projectPath": "D:\\Code\\P7\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
+      "projectPath": "C:\\Users\\Jguld\\Desktop\\UserManagerService\\UserManager\\UsermanagerService\\UsermanagerService.csproj",
       "packagesPath": "C:\\Users\\Jguld\\.nuget\\packages\\",
-      "outputPath": "D:\\Code\\P7\\UserManagerService\\UserManager\\UsermanagerService\\obj\\",
+      "outputPath": "C:\\Users\\Jguld\\Desktop\\UserManagerService\\UserManager\\UsermanagerService\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Jguld\\AppData\\Roaming\\NuGet\\NuGet.Config",
