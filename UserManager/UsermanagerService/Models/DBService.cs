@@ -9,6 +9,7 @@ using System.Security.Claims;
 using System.Text;
 using UsermanagerService.Exceptions;
 using MySql.Data.MySqlClient;
+using System.Transactions;
 
 namespace UsermanagerService.Models
 {
@@ -19,6 +20,7 @@ namespace UsermanagerService.Models
         public DBService(string uRL)
         {
             connection = new MySqlConnection(uRL);
+            
         }
         
         /// <summary>
@@ -155,13 +157,20 @@ namespace UsermanagerService.Models
             string getIdQuery = $"SELECT id FROM user " +
                                 $"WHERE username = '{user.Username}' AND city = '{user.City}' AND institute = '{user.Institute}' AND role  = '{user.Role}'";
 
+
+           
             //Sql Commands
             MySqlCommand insertCommand = new MySqlCommand(insertQuery, this.connection); //The command to insert user into user table
             MySqlCommand IdCommand = new MySqlCommand(getIdQuery, this.connection); //The command to retrieve the id of the inserted user.W
-
+            
+            
             try
             {
                 this.connection.Open();
+                var tr = connection.BeginTransaction();
+                insertCommand.Transaction = tr;
+                IdCommand.Transaction = tr;
+                
                 int RowsEffected = insertCommand.ExecuteNonQuery(); //execute insertion in user table
 
                 if (RowsEffected != 1) { throw new InsertionException("Insertion Failed"); }
@@ -173,19 +182,17 @@ namespace UsermanagerService.Models
                 reader.Close();
                 IdCommand.Dispose();
                 insertCommand.Dispose();
-
                 // Execute insertion in password table
                 MySqlCommand passwordCommand = new MySqlCommand($"INSERT INTO password VALUES ({id},'{user.Password}')", this.connection);
                 passwordCommand.ExecuteNonQuery();
                 passwordCommand.Dispose();
 
+                tr.Commit();
                 return true;
             }
             catch (InsertionException) { return false; }
             catch (MySqlException)
             {
-
-                //ROLLBACK
                 throw new DatabaseException("DATABASE ERROR");
             }
             finally
@@ -193,6 +200,7 @@ namespace UsermanagerService.Models
                 if (this.connection.State == ConnectionState.Open) { this.connection.Close(); }
                 IdCommand.Dispose();
                 insertCommand.Dispose();
+                             
             }
         }
     }
