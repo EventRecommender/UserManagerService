@@ -1,0 +1,17 @@
+version: '3'
+services:
+  activity-service: 
+    build: .
+    container_name: usermanager-service
+    ports:
+      - 8003:80
+
+  mysql:
+    image: mysql
+    container_name: usermanager_database
+    environment:
+      MYSQL_ROOT_PASSWORD: fuper
+      MYSQL_DATABASE: usermanager_db
+    volumes:
+      - ./mysql_db_data:/var/lib/mysql
+      - ./entry:/docker-entrypoint-initdb.d/ 

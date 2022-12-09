@@ -10,25 +10,27 @@ namespace UsermanagerService.Models
 {
     public class Authenticator
     {
-        DBService dBService = new DBService("");
-       
+        public Authenticator(DBService database)
+        {
+            DBService = database;
+        }
 
-        public User? Login(string username, byte[] Inputpassword)
+        DBService DBService;
+       
+        public User? Login(string username, string Inputpassword)
         {
             try
             {
-                dBService.FetchUserAndPasswordFromUsername(username, out User user, out byte[] password);
+                DBService.FetchUserAndPasswordFromUsername(username, out User user, out string password);
 
                 if (Inputpassword == password)
                 {
                     return user;
                 }
                 else { return null; }
-
+                 
             }
             catch (InstanceException) { throw new Exception("0"); }
-
-
         }
 
         public void CreatePasswordHash(string password, out byte[] Hash, out byte[] Salt)
@@ -38,12 +40,10 @@ namespace UsermanagerService.Models
                 Salt = hmac.Key;
                 Hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
             }
-
         }
 
         public byte[] HashPassword(string password, byte[] salt)
         {
-
             using (var hmac = new HMACSHA512(salt))
             {
                 return hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
@@ -52,7 +52,6 @@ namespace UsermanagerService.Models
 
         public string GenerateToken(string username, string issuer, string audience, byte[] key)
         {
-
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new[]
@@ -75,7 +74,6 @@ namespace UsermanagerService.Models
             var jwtToken = tokenHandler.WriteToken(token);
             
             return jwtToken;
-
         }
 
         public bool isTokenValid(string token, byte[] key, string issuer, string audience)
@@ -101,7 +99,6 @@ namespace UsermanagerService.Models
 
                 return true;
             } catch (Exception) { return false; }
-            
         }
     }
 }

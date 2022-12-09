@@ -2,25 +2,24 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Reflection.PortableExecutable;
 using System.Security.Claims;
 using System.Text;
 using UsermanagerService.Exceptions;
+using MySql.Data.MySqlClient;
 
 namespace UsermanagerService.Models
 {
     public class DBService
     {
-        private SqlConnection connection;
+        private MySqlConnection connection;
 
         public DBService(string uRL)
         {
-            connection = new SqlConnection(uRL);
+            connection = new MySqlConnection(uRL);
         }
-
         
         /// <summary>
         /// Fetches a user and password from the database
@@ -30,31 +29,29 @@ namespace UsermanagerService.Models
         /// <param name="password"></param>
         /// <exception cref="InstanceException"></exception>
         /// <exception cref="DatabaseException"></exception>
-        public void FetchUserAndPasswordFromUsername(string username, out User user, out byte[] password)
+        public void FetchUserAndPasswordFromUsername(string username, out User user, out string password)
         {
-            List<Tuple<User, byte[]>> FoundUsers = new List<Tuple<User, byte[]>>();
+            List<Tuple<User, string>> FoundUsers = new List<Tuple<User, string>>();
 
             //Query
-            string query = $"SELECT * " +
-                           $"FROM user" +
-                           $" FULL OUTER JOIN password" +
-                           $"ON user.id = password.id" +
-                           $" WHERE username = {username};";
+            string query = $"SELECT user.id, user.username, user.city, user.institute, user.role, password.password " +
+                           $"FROM user JOIN password " +
+                           $"ON user.id = password.userid " +
+                           $"WHERE username = '{username}';";
+            
             //Command
-            SqlCommand command = new SqlCommand(query, this.connection);
-
+            MySqlCommand command = new MySqlCommand(query, this.connection);
             try
             {
-                connection.Open();
-                
-                SqlDataReader reader = command.ExecuteReader();
-                
+                this.connection.Open();
+                MySqlDataReader reader = command.ExecuteReader();
+
                 while (reader.Read())
                 {
                     User FoundUser = new User((int)reader[0], (string)reader[1], (string)reader[2], (string)reader[3], (string)reader[4]); //Creates user from retrieved rows
-                    byte[] FoundPas = (byte[])reader[5]; //Sets retrieved password hash
+                    string FoundPas = (string)reader[5]; //Sets retrieved password hash
 
-                    FoundUsers.Add(new Tuple<User, byte[]>(FoundUser, FoundPas));
+                    FoundUsers.Add(new Tuple<User, string>(FoundUser, FoundPas));
                 }
 
                 reader.Close();
@@ -67,12 +64,11 @@ namespace UsermanagerService.Models
                 }
                 else { throw new InstanceException($"{FoundUsers.Count}"); }
             }
-            catch (SqlException) { throw new DatabaseException("Database Error"); }
+            catch (MySqlException) { throw new DatabaseException("Database Error"); }
             finally { if (this.connection.State == ConnectionState.Open) { this.connection.Close(); } }
 
         }
         
-
        /// <summary>
        /// Return a user from database.
        /// </summary>
@@ -84,15 +80,15 @@ namespace UsermanagerService.Models
         {
             List<User> users = new List<User>();
             //Query 
-            string query = $"SELECT * from user WHERE id = {userId}";
+            string query = $"SELECT * FROM user WHERE id = {userId}";
 
             //SQL Command
-            SqlCommand command = new SqlCommand(query, this.connection);
+            MySqlCommand command = new MySqlCommand(query, this.connection);
 
             try
             {
                 this.connection.Open();
-                SqlDataReader reader = command.ExecuteReader();
+                MySqlDataReader reader = command.ExecuteReader();
 
                 while (reader.Read())
                 {
@@ -102,7 +98,6 @@ namespace UsermanagerService.Models
                 reader.Close();
                 command.Dispose();
                
-
                 if (users.Count == 1)
                 {
                     return users[0]; 
@@ -110,63 +105,59 @@ namespace UsermanagerService.Models
                 else { throw new InstanceException($"{users.Count}"); }
 
             }
-            catch (SqlException ex) { throw new DatabaseException(ex.Message); }
+            catch (MySqlException ex) { throw new DatabaseException(ex.Message); }
             finally { if (this.connection.State == ConnectionState.Open) { this.connection.Close(); } }
         }
 
-        
         public bool DeleteUser(int userId)
         {
-            //Queries
-            string query1 = $"DELETE FROM user WHERE id = {userId};";
-            string query2 = $"DELETE FROM password WHERE id = {userId};";
 
-            //Commands
-            SqlCommand delUsercommand = new SqlCommand(query1, this.connection);
-            SqlCommand delpasswordcommand = new SqlCommand(query2, this.connection);
+            //Queries (password is deleted in the cascade)
+            string query1 = $"DELETE FROM user WHERE id = '{userId}';";
+
+            //Command
+            MySqlCommand delUsercommand = new MySqlCommand(query1, this.connection);
             try
             {
                 this.connection.Open();
-                delUsercommand.ExecuteNonQuery(); //delete the user from user table
-                delpasswordcommand.ExecuteNonQuery(); //delete the user from password table
+                int affected = delUsercommand.ExecuteNonQuery(); //delete the user from user table
+                if (affected == 0)
+                    return false;
+           
                 return true;
             }
-            catch {
+            catch (MySqlException){
 
-                //Implement SQL ROLLBACK
-                return false;
+                throw new DatabaseException("DATABASE ERROR");
             }
             finally { if (this.connection.State == ConnectionState.Open) { this.connection.Close(); } }
 
-
         }
 
-       /// <summary>
-       /// Adds a user to both user and password table.
-       /// </summary>
-       /// <param name="user"></param>
-       /// <param name="hashedPassword"></param>
-       /// <returns></returns>
-       /// <exception cref="DatabaseException"></exception>
-        public bool AddUser(UIntUser user, byte[] hashedPassword)
+        /// <summary>
+        /// Adds a user to both user and password table.
+        /// </summary>
+        /// <param name="user"></param>
+        /// <param name="hashedPassword"></param>
+        /// <returns></returns>
+        /// <exception cref="DatabaseException"></exception>
+        public bool AddUser(UIntUser user, string hashedPassword)
         {
             int id = -1;
-
             //Queries
-            string insertQuery = $"IF NOT EXIST " +
-                       $"SELECT * FROM user " +
-                       $"WHERE username = {user.Username} " +
-                       $"BEGIN " +
-                       $"INSERT INTO user ({user.Username}, {user.City}, {user.Institute}, {user.Role}) " +
-                       $"END";
+
+            string insertQuery = $"INSERT INTO user (username, city, institute, role) " +
+                                $"SELECT * FROM (SELECT '{user.Username}' AS username, '{user.City}' AS city, '{user.Institute}' AS institute, '{user.Role}' AS role ) AS temp " +
+                                $"WHERE NOT EXISTS( " +
+                                $"SELECT username FROM user WHERE username = '{user.Username}' " +
+                                $") LIMIT 1;";
 
             string getIdQuery = $"SELECT id FROM user " +
-                                $"WHERE username = {user.Username} city = {user.City} institute = {user.Institute} role  = {user.Role}";
+                                $"WHERE username = '{user.Username}' AND city = '{user.City}' AND institute = '{user.Institute}' AND role  = '{user.Role}'";
 
-            //SQL Commands
-            SqlCommand insertCommand = new SqlCommand(insertQuery, this.connection); //The command to insert user into user table
-            SqlCommand IdCommand = new SqlCommand(getIdQuery, this.connection); //The command to retrieve the id of the inserted user.
-            SqlCommand passwordCommand = new SqlCommand($"INSERT INTO password ({id},{hashedPassword}", this.connection);
+            //Sql Commands
+            MySqlCommand insertCommand = new MySqlCommand(insertQuery, this.connection); //The command to insert user into user table
+            MySqlCommand IdCommand = new MySqlCommand(getIdQuery, this.connection); //The command to retrieve the id of the inserted user.W
 
             try
             {
@@ -175,34 +166,34 @@ namespace UsermanagerService.Models
 
                 if (RowsEffected != 1) { throw new InsertionException("Insertion Failed"); }
 
-                SqlDataReader reader = IdCommand.ExecuteReader(); //read from the user table   
+                MySqlDataReader reader = IdCommand.ExecuteReader(); //read from the user table   
 
-                while (reader.Read()) { id = (int)reader[0];  }
+                while (reader.Read()) { id = (int)reader[0]; }
+
                 reader.Close();
-                passwordCommand.ExecuteNonQuery(); // Execute insertion in password table
+                IdCommand.Dispose();
+                insertCommand.Dispose();
+
+                // Execute insertion in password table
+                MySqlCommand passwordCommand = new MySqlCommand($"INSERT INTO password VALUES ({id},'{hashedPassword}')", this.connection);
+                passwordCommand.ExecuteNonQuery();
+                passwordCommand.Dispose();
 
                 return true;
             }
-            catch (InsertionException) { return false; }
-            catch (SqlException) {
+            catch (InsertionException ex) { return false; }
+            catch (MySqlException ex)
+            {
 
                 //ROLLBACK
                 throw new DatabaseException("DATABASE ERROR");
             }
-            finally { 
-
+            finally
+            {
                 if (this.connection.State == ConnectionState.Open) { this.connection.Close(); }
                 IdCommand.Dispose();
                 insertCommand.Dispose();
-                passwordCommand.Dispose();
             }
-
         }
-
-        
-        
-        
-
-
     }
 }

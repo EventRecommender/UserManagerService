@@ -11,9 +11,10 @@ using System.Security.Claims;
 using Org.BouncyCastle.Asn1.Ocsp;
 using Org.BouncyCastle.Ocsp;
 
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-var dBService = new DBService("");
-Authenticator auth = new Authenticator();
+var builder = WebApplication.CreateBuilder(args);
+var dBService = new DBService(@"server=usermanager_database;userid=root;password=fuper;database=usermanager_db");
+Authenticator auth = new Authenticator(dBService);
+
 
 builder.Services.AddAuthentication(options =>
 {
@@ -39,7 +40,7 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-app.MapPost("/login", [AllowAnonymous] (string username, byte[] password) =>
+app.MapPost("/login", [AllowAnonymous] (string username,string password) =>
 {
     string issuer = builder.Configuration["JWT:Issuer"];
     string audience = builder.Configuration["JWT:Audience"];
@@ -56,12 +57,12 @@ app.MapPost("/login", [AllowAnonymous] (string username, byte[] password) =>
 
         UserAuth userAuth = new UserAuth(user.ID, user.username, user.role, token);
 
-        return Results.Accepted(JsonSerializer.Serialize(userAuth));
+        return Results.Ok(JsonSerializer.Serialize(userAuth));
 
     }
     catch (DatabaseException) { return Results.StatusCode(503); }
     catch (Exception ex) { return Results.Problem(detail:ex.Message); }
-    
+  
 });
 
 app.MapGet("/fetch", [Authorize] (int userID) =>
@@ -83,13 +84,13 @@ app.MapGet("/verify", [Authorize] (HttpRequest req) => {
     string issuer = builder.Configuration["JWT:Issuer"];
     string audience = builder.Configuration["JWT:Audience"];
 
-    if (auth.isTokenValid(inputToken, key, issuer, audience)) { return Results.Accepted(value: true); }
+    if (auth.isTokenValid(inputToken, key, issuer, audience)) { return Results.Ok(value: true); }
 
     return Results.BadRequest(false);
 
 }).RequireAuthorization();
 
-app.MapPut("/Create", [AllowAnonymous] (string username, byte[] password, string city, string institue, string role) =>
+app.MapPut("/Create", [AllowAnonymous] (string username, string password, string city, string institue, string role) =>
 {
     UIntUser UnitializedUser = new UIntUser(username, city, institue, role);
 
@@ -106,11 +107,18 @@ app.MapPut("/Create", [AllowAnonymous] (string username, byte[] password, string
 
 app.MapGet("/delete", [Authorize] (int userId) =>
 {
-    if (dBService.DeleteUser(userId))
+    try
     {
-        return Results.Ok(true);
+        if (dBService.DeleteUser(userId))
+        {
+            return Results.Ok(true);
+        }
+        else { return Results.NotFound(false); }
     }
-    else{ return Results.NotFound(false); }
+    catch (DatabaseException ex)
+    {
+        return Results.Problem(ex.Message);
+    }
 });
 
 app.MapPost("/CreateToken", (string username, string password) =>
