@@ -10,13 +10,18 @@ namespace UsermanagerService.Models
 {
     public class Authenticator
     {
-        public Authenticator(DBService database)
+        DBService DBService;
+        private string Issuer;
+        private string Audience;
+        private byte[] Key;
+        public Authenticator(DBService database, string issuer, string audience, byte[] key)
         {
             DBService = database;
+            Issuer = issuer;
+            Audience = audience;
+            Key = key;
         }
 
-        DBService DBService;
-       
         public User? Login(string username, string Inputpassword)
         {
             try
@@ -50,7 +55,7 @@ namespace UsermanagerService.Models
             }
         }
 
-        public string GenerateToken(string username, string issuer, string audience, byte[] key)
+        public string GenerateToken(string username)
         {
             var tokenDescriptor = new SecurityTokenDescriptor
             {
@@ -63,20 +68,19 @@ namespace UsermanagerService.Models
                 Guid.NewGuid().ToString())
              }),
                 Expires = DateTime.UtcNow.AddHours(1),
-                Issuer = issuer,
-                Audience = audience,
+                Issuer = this.Issuer,
+                Audience = this.Audience,
                 SigningCredentials = new SigningCredentials
-            (new SymmetricSecurityKey(key),
+            (new SymmetricSecurityKey(this.Key),
             SecurityAlgorithms.HmacSha512Signature)
             };
             var tokenHandler = new JwtSecurityTokenHandler();
             var token = tokenHandler.CreateToken(tokenDescriptor);
             var jwtToken = tokenHandler.WriteToken(token);
-            
             return jwtToken;
         }
 
-        public bool isTokenValid(string token, byte[] key, string issuer, string audience)
+        public bool isTokenValid(string token)
         {
             if(token == null) return false;
 
@@ -87,9 +91,9 @@ namespace UsermanagerService.Models
                 TokenHandler.ValidateToken(token, new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ValidAudience = audience,
-                    ValidIssuer = issuer,
+                    IssuerSigningKey = new SymmetricSecurityKey(this.Key),
+                    ValidAudience = this.Audience,
+                    ValidIssuer = this.Issuer,
                     ValidateIssuer = true,
                     ValidateAudience = true,
                     ClockSkew = TimeSpan.Zero
