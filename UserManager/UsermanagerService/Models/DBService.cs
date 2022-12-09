@@ -141,7 +141,7 @@ namespace UsermanagerService.Models
         /// <param name="hashedPassword"></param>
         /// <returns></returns>
         /// <exception cref="DatabaseException"></exception>
-        public bool AddUser(UIntUser user, string hashedPassword)
+        public bool AddUser(UIntUser user)
         {
             int id = -1;
             //Queries
@@ -175,14 +175,14 @@ namespace UsermanagerService.Models
                 insertCommand.Dispose();
 
                 // Execute insertion in password table
-                MySqlCommand passwordCommand = new MySqlCommand($"INSERT INTO password VALUES ({id},'{hashedPassword}')", this.connection);
+                MySqlCommand passwordCommand = new MySqlCommand($"INSERT INTO password VALUES ({id},'{user.Password}')", this.connection);
                 passwordCommand.ExecuteNonQuery();
                 passwordCommand.Dispose();
 
                 return true;
             }
-            catch (InsertionException ex) { return false; }
-            catch (MySqlException ex)
+            catch (InsertionException) { return false; }
+            catch (MySqlException)
             {
 
                 //ROLLBACK
