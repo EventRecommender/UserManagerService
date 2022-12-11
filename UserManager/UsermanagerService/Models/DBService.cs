@@ -141,9 +141,9 @@ namespace UsermanagerService.Models
         /// </summary>
         /// <param name="user"></param>
         /// <param name="hashedPassword"></param>
-        /// <returns></returns>
+        /// <returns>id of the user or -1 if no user was made</returns>
         /// <exception cref="DatabaseException"></exception>
-        public bool AddUser(UIntUser user)
+        public int AddUser(UIntUser user)
         {
             int id = -1;
             //Queries
@@ -188,9 +188,9 @@ namespace UsermanagerService.Models
                 passwordCommand.Dispose();
 
                 tr.Commit();
-                return true;
+                return id;
             }
-            catch (InsertionException) { return false; }
+            catch (InsertionException) { return -1; }
             catch (MySqlException)
             {
                 throw new DatabaseException("DATABASE ERROR");
