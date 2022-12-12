@@ -2,17 +2,19 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using System.Text;
 using UsermanagerService.Models;
+using System.IdentityModel.Tokens.Jwt;
 namespace UserManager
 {
-    public class Tests
+    public class isTokenValidTest
     {
         Authenticator auth { get; set; }
         String TestToken { get; set; }
 
+        WebApplicationBuilder builder { get; set; }
         [SetUp]
         public void Setup()
         {
-            var builder = WebApplication.CreateBuilder();
+            builder = WebApplication.CreateBuilder();
             var dBService = new DBService(@"server=usermanager_database;userid=root;password=fuper;database=usermanager_db");
             string issuer = builder.Configuration["JWT:Issuer"];
             string audience = builder.Configuration["JWT:Audience"];
@@ -25,30 +27,44 @@ namespace UserManager
         }
 
         [Test]
-        public void isTokenValid_TokenGeneratedByAuthenticator_TokenIsAccepted()
+        public void TokenGeneratedByAuthenticator_TokenIsAccepted()
         {
             //Arrange
             string token = TestToken;
             
             //Act
-            bool valid = auth.isTokenValid(token);
+            bool validity = auth.isTokenValid(token);
 
             //Assert
-            Assert.IsTrue(valid);
+            Assert.IsTrue(validity);
         }
 
         [Test]
-        public void isTokenValid_ModifiedToken_TokenIsRejected()
+        public void ModifiedToken_TokenIsRejected()
         {
             //Arrange
             string token =  ScrambleString(TestToken);
 
             //Act
 
-            bool valid = auth.isTokenValid(token);
+            bool validity = auth.isTokenValid(token);
 
             //Assert
-            Assert.IsFalse(valid);
+            Assert.IsFalse(validity);
+        }
+
+        [Test]
+        public void RandomString_TokenIsRejected()
+        {
+            //Arrange
+            string randomString = "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJJZCI6IjIwZDEyY6jOjLTRmMWUtNGRmNy04YWRjLTU1YTdiZjNmOTJmOCIsInN1YiI6IlRlc3QiLCJlbWFpbCI6IlRlc3QiLCJqdGkiOiI4ZjNhNmJjOC02OTFlLTQxZTEtOGMxNC1mMDg1OWM2ZGVkYzEiLCJuYmYiOjE2NzA4MzgwNzMsImV4cCI6MTY3MDg0MTY3MywiaWF0IjoxNjcwODM4MDczLCJpc3MiOiJVc2VyTWFuYWdlclNlcnZpY2UyMjAyIiwiYXVkIjoiRXZlbnRSZWNvbW1lbmRlclN5c3RlbSJ9.ZOxe8cBBat0GpKk3qDIp_xKSrzoYfe6zAf6DXjyUzsGAEgzC-aWt4Kw0BRYK3hUT0VKen62CdgGnhNXnSGfxbg";
+            
+            //Act
+            bool validity = auth.isTokenValid(randomString); 
+            
+            //Assert
+            Assert.IsFalse(validity);
+
         }
 
         private string ScrambleString(string s)
