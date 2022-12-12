@@ -55,9 +55,9 @@ app.MapPost("/login", [AllowAnonymous] (LoginInput input) =>
 
         string token = auth.GenerateToken(user.username);
 
-        UserAuth userAuth = new UserAuth(user.ID, user.username, user.role, token);
+        UserAuth userAuth = new UserAuth(user.ID, user.username, user.role, user.city, token);
 
-        return Results.Ok(JsonSerializer.Serialize(userAuth));
+        return Results.Json(userAuth);
     }
     catch (DatabaseException) { return Results.StatusCode(503); }
     catch (Exception ex) { return Results.Problem(detail:ex.Message); }
@@ -69,7 +69,7 @@ app.MapGet("/fetch", [Authorize] (int userID) =>
     try
     {
         User user = dBService.FetchUserFromID(userID);
-        return Results.Ok(JsonSerializer.Serialize(user));
+        return Results.Json(user);
     }
     catch (DatabaseException ) { return Results.StatusCode(503); }//return serice unavailable
     catch (InstanceException ex) { return Results.Problem(detail: $"Found {ex.Message} users"); }
@@ -90,7 +90,8 @@ app.MapPut("/Create", [AllowAnonymous] (UIntUser UnitializedUser) =>
    
     try
     {
-        if (dBService.AddUser(UnitializedUser)){ return Results.Ok(true); }
+        int id = dBService.AddUser(UnitializedUser);
+        if (id != -1){ return Results.Ok(id); }
         else { return Results.Conflict("User already exist"); }
     }
     catch (DatabaseException ex)
@@ -133,13 +134,12 @@ app.MapGet("/FetchAllUsers", [Authorize]() =>
     {
         List<User> users = dBService.FetchAllUsers();
 
-        return Results.Ok(JsonSerializer.Serialize(users));
+        return Results.Json(users);
     }
     catch (Exception ex)
     {
         return Results.Problem(ex.Message);
     }
-    
 });
 
 app.UseAuthentication();
