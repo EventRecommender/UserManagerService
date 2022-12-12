@@ -111,6 +111,12 @@ namespace UsermanagerService.Models
             finally { if (this.connection.State == ConnectionState.Open) { this.connection.Close(); } }
         }
 
+        /// <summary>
+        /// Deletes a user from the database
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <returns>True - the user is removed. False - No user removed</returns>
+        /// <exception cref="DatabaseException"></exception>
         public bool DeleteUser(int userId)
         {
 
@@ -203,7 +209,11 @@ namespace UsermanagerService.Models
                              
             }
         }
-
+        /// <summary>
+        /// Retrieves all users from database.
+        /// </summary>
+        /// <returns>List of user objects</returns>
+        /// <exception cref="DatabaseException"></exception>
         public List<User> FetchAllUsers()
         {
             List<User> users = new List<User>();
