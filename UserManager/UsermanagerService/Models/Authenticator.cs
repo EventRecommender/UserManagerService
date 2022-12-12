@@ -21,7 +21,13 @@ namespace UsermanagerService.Models
             Audience = audience;
             Key = key;
         }
-
+        /// <summary>
+        /// Checks if the user is stored in the database, and the password is correct.
+        /// </summary>
+        /// <param name="username"></param>
+        /// <param name="Inputpassword"></param>
+        /// <returns>A User object if credentials are correct. Null if credentials are incorrect</returns>
+        /// <exception cref="Exception"></exception>
         public User? Login(string username, string Inputpassword)
         {
             try
@@ -38,23 +44,11 @@ namespace UsermanagerService.Models
             catch (InstanceException) { throw new Exception("0"); }
         }
 
-        public void CreatePasswordHash(string password, out byte[] Hash, out byte[] Salt)
-        {
-            using (var hmac = new HMACSHA512())
-            {
-                Salt = hmac.Key;
-                Hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-            }
-        }
-
-        public byte[] HashPassword(string password, byte[] salt)
-        {
-            using (var hmac = new HMACSHA512(salt))
-            {
-                return hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-            }
-        }
-
+        /// <summary>
+        /// Generate a JSON Web Token to the given user.
+        /// </summary>
+        /// <param name="username"></param>
+        /// <returns>A JSON Web Token as string</returns>
         public string GenerateToken(string username)
         {
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -63,7 +57,6 @@ namespace UsermanagerService.Models
             {
                 new Claim("Id", Guid.NewGuid().ToString()),
                 new Claim(JwtRegisteredClaimNames.Sub, username),
-                new Claim(JwtRegisteredClaimNames.Email, username),
                 new Claim(JwtRegisteredClaimNames.Jti,
                 Guid.NewGuid().ToString())
              }),
@@ -80,6 +73,11 @@ namespace UsermanagerService.Models
             return jwtToken;
         }
 
+        /// <summary>
+        /// Checks if a token is valid and not expired.
+        /// </summary>
+        /// <param name="token"></param>
+        /// <returns>True - The token is valid. False - Token is invalid or expired.</returns>
         public bool isTokenValid(string token)
         {
             if(token == null) return false;
@@ -89,14 +87,14 @@ namespace UsermanagerService.Models
             try
             {
                 TokenHandler.ValidateToken(token, new TokenValidationParameters
-                {
+                { 
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(this.Key),
                     ValidAudience = this.Audience,
                     ValidIssuer = this.Issuer,
                     ValidateIssuer = true,
                     ValidateAudience = true,
-                    ClockSkew = TimeSpan.Zero
+                    ClockSkew = TimeSpan.Zero //Checks the expiration is within the accepted time frame.
                 }, out SecurityToken validatedToken); ;
 
                 var jwToken = (JwtSecurityToken)validatedToken;

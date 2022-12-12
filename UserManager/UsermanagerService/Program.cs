@@ -45,8 +45,6 @@ var app = builder.Build();
 
 app.MapPost("/login", [AllowAnonymous] (LoginInput input) =>
 {
-    
-
     try
     {
         User? user = auth.Login(input.Username, input.Password);
@@ -55,9 +53,7 @@ app.MapPost("/login", [AllowAnonymous] (LoginInput input) =>
 
         string token = auth.GenerateToken(user.username);
 
-        UserAuth userAuth = new UserAuth(user.ID, user.username, user.role, user.city, token);
-
-        return Results.Json(userAuth);
+        return Results.Json(new UserAuth(user.ID, user.username, user.role, user.city, token));
     }
     catch (DatabaseException) { return Results.StatusCode(503); }
     catch (Exception ex) { return Results.Problem(detail:ex.Message); }
@@ -68,8 +64,7 @@ app.MapGet("/fetch", [Authorize] (int userID) =>
 { 
     try
     {
-        User user = dBService.FetchUserFromID(userID);
-        return Results.Json(user);
+        return Results.Json(dBService.FetchUserFromID(userID));
     }
     catch (DatabaseException ) { return Results.StatusCode(503); }//return serice unavailable
     catch (InstanceException ex) { return Results.Problem(detail: $"Found {ex.Message} users"); }
@@ -87,7 +82,6 @@ app.MapGet("/verify", [Authorize] (HttpRequest req) => {
 
 app.MapPut("/Create", [AllowAnonymous] (UIntUser UnitializedUser) =>
 {
-   
     try
     {
         int id = dBService.AddUser(UnitializedUser);
@@ -96,7 +90,7 @@ app.MapPut("/Create", [AllowAnonymous] (UIntUser UnitializedUser) =>
     }
     catch (DatabaseException ex)
     {
-        return Results.Problem(ex.Message);
+        return Results.Problem(detail: ex.Message);
     }
 });
 
@@ -104,10 +98,7 @@ app.MapGet("/delete", [Authorize] (int userId) =>
 {
     try
     {
-        if (dBService.DeleteUser(userId))
-        {
-            return Results.Ok(true);
-        }
+        if (dBService.DeleteUser(userId)){ return Results.Ok(true); }
         else { return Results.NotFound(false); }
     }
     catch (DatabaseException ex)
@@ -116,25 +107,11 @@ app.MapGet("/delete", [Authorize] (int userId) =>
     }
 });
 
-app.MapPost("/CreateToken", (LoginInput login) =>
-{
-    if (login.Username == "Test" && login.Password == "test123")
-    {
-        var token = auth.GenerateToken(login.Username);
-        
-        return Results.Ok(token);
-    }
-    return Results.Unauthorized();
-
-});
-
 app.MapGet("/FetchAllUsers", [Authorize]() =>
 {
     try
     {
-        List<User> users = dBService.FetchAllUsers();
-
-        return Results.Json(users);
+        return Results.Json(dBService.FetchAllUsers());
     }
     catch (Exception ex)
     {
