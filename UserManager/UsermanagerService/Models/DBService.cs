@@ -33,42 +33,48 @@ namespace UsermanagerService.Models
         {
             var connection = new MySqlConnection(connectionString);
 
-            List<Tuple<User, string>> FoundUsers = new List<Tuple<User, string>>();
-
             //Query
-            string query = $"SELECT user.id, user.username, user.city, user.institute, user.role, password.password " +
-                           $"FROM user JOIN password " +
-                           $"ON user.id = password.userid " +
+            string getIdQeury = $"SELECT user.id, user.username, user.city, user.institute, user.role " +
+                          $"FROM user " +
                            $"WHERE username = '{username}';";
             
-            //Command
-            MySqlCommand command = new MySqlCommand(query, connection);
+            MySqlCommand command = new MySqlCommand(getIdQeury, connection);
+            connection.Open();
+            MySqlDataReader reader = command.ExecuteReader();
             try
             {
-                connection.Open();
-                MySqlDataReader reader = command.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    User FoundUser = new User((int)reader[0], (string)reader[1], (string)reader[2], (string)reader[3], (string)reader[4]); //Creates user from retrieved rows
-                    string FoundPas = (string)reader[5]; //Sets retrieved password hash
-
-                    FoundUsers.Add(new Tuple<User, string>(FoundUser, FoundPas));
+                
+                if (!reader.Read()){
+                    command.Dispose();
+                    reader.Dispose();
+                    connection.Close();
+                    throw new InstanceException("no users found");
                 }
+                user = new User((int)reader[0], (string)reader[1], (string)reader[2], (string)reader[3], (string)reader[4]); //Creates user from retrieved rows
 
+                command.Dispose();
                 reader.Close();
                 connection.Close();
-                if (FoundUsers.Count == 1)
-                {
-                    user = FoundUsers[0].Item1;
-                    password = FoundUsers[0].Item2;
-                    
+
+                connection.Open();
+                string getPassQuery = $"SELECT password FROM password WHERE userid = '{user.ID}';";
+                command = new MySqlCommand(getPassQuery, connection);
+                reader = command.ExecuteReader();
+                if (!reader.Read()){
+                    reader.Dispose();
+                    command.Dispose();
+                    connection.Close();
+                    throw new InstanceException("no password found for the given user");
                 }
-                else { throw new InstanceException($"{FoundUsers.Count}"); }
+                password = (string)reader[0];
+
+                connection.Close();
             }
             catch (MySqlException) {
+                command.Dispose();
+                reader.Close();
                 connection.Close();
-                throw new DatabaseException("Database Error"); }
+                throw; }
         }
         
        /// <summary>
@@ -88,11 +94,12 @@ namespace UsermanagerService.Models
 
             //SQL Command
             MySqlCommand command = new MySqlCommand(query, connection);
-
+            connection.Open();
+            MySqlDataReader reader = command.ExecuteReader();
             try
             {
-                connection.Open();
-                MySqlDataReader reader = command.ExecuteReader();
+                
+                
 
                 while (reader.Read())
                 {
@@ -111,6 +118,8 @@ namespace UsermanagerService.Models
 
             }
             catch (MySqlException ex) {
+                command.Dispose();
+                reader.Close();
                 connection.Close();
                 throw new DatabaseException(ex.Message); }
         }
@@ -135,17 +144,22 @@ namespace UsermanagerService.Models
                 connection.Open();
                 int affected = delUsercommand.ExecuteNonQuery(); //delete the user from user table
                 connection.Close();
-                if (affected == 0)
+                if (affected == 0){
+                    delUsercommand.Dispose();
                     return false;
-           
+                }
+
+                delUsercommand.Dispose();
                 return true;
             }
             catch (MySqlException)
             {
+                delUsercommand.Dispose();
                 connection.Close();
-                throw new DatabaseException("DATABASE ERROR");
+                throw;
             }
         }
+
 
         /// <summary>
         /// Adds a user to both user and password table.
@@ -160,12 +174,24 @@ namespace UsermanagerService.Models
 
             int id = -1;
             //Queries
+            string findUserQuery = $"SELECT username FROM user WHERE username = '{user.Username}' LIMIT 1;";
+            connection.Open();
+            
+            MySqlCommand findUserCommand = new MySqlCommand(findUserQuery,connection);
+            MySqlDataReader reader2 = findUserCommand.ExecuteReader();
+            if (reader2.Read()){
+                findUserCommand.Dispose();
+                reader2.Dispose();
+                connection.Close();
+                return -1;
+            }
+
+            findUserCommand.Dispose();
+            reader2.Dispose();
+            connection.Close();
 
             string insertQuery = $"INSERT INTO user (username, city, institute, role) " +
-                                $"SELECT * FROM (SELECT '{user.Username}' AS username, '{user.City}' AS city, '{user.Institute}' AS institute, '{user.Role}' AS role ) AS temp " +
-                                $"WHERE NOT EXISTS( " +
-                                $"SELECT username FROM user WHERE username = '{user.Username}' " +
-                                $") LIMIT 1;";
+                                $"VALUES ('{user.Username}','{user.City}','{user.Institute}','{user.Role}');";
 
             string getIdQuery = $"SELECT id FROM user " +
                                 $"WHERE username = '{user.Username}' AND city = '{user.City}' AND institute = '{user.Institute}' AND role  = '{user.Role}'";
@@ -175,19 +201,23 @@ namespace UsermanagerService.Models
             //Sql Commands
             MySqlCommand insertCommand = new MySqlCommand(insertQuery, connection); //The command to insert user into user table
             MySqlCommand IdCommand = new MySqlCommand(getIdQuery, connection); //The command to retrieve the id of the inserted user.W
-            
-            
+            MySqlDataAdapter adapter = new MySqlDataAdapter();
+
+            adapter.InsertCommand = insertCommand;
             try
             {
                 connection.Open();
-                var tr = connection.BeginTransaction();
-                insertCommand.Transaction = tr;
-                IdCommand.Transaction = tr;
                 
-                int RowsEffected = insertCommand.ExecuteNonQuery(); //execute insertion in user table
-
-                if (RowsEffected != 1) { throw new InsertionException("Insertion Failed"); }
-
+                int RowsEffected = adapter.InsertCommand.ExecuteNonQuery(); //execute insertion in user table
+                connection.Close();
+                if (RowsEffected != 1) 
+                {
+                    adapter.Dispose();
+                    insertCommand.Dispose();
+                    IdCommand.Dispose(); 
+                    throw new InsertionException("Insertion Failed"); 
+                }
+                connection.Open();
                 MySqlDataReader reader = IdCommand.ExecuteReader(); //read from the user table   
 
                 while (reader.Read()) { id = (int)reader[0]; }
@@ -195,12 +225,13 @@ namespace UsermanagerService.Models
                 reader.Close();
                 IdCommand.Dispose();
                 insertCommand.Dispose();
+                adapter.Dispose();
                 // Execute insertion in password table
+                connection.Close();
+                connection.Open();
                 MySqlCommand passwordCommand = new MySqlCommand($"INSERT INTO password VALUES ({id},'{user.Password}')", connection);
                 passwordCommand.ExecuteNonQuery();
                 passwordCommand.Dispose();
-
-                tr.Commit();
                 connection.Close();
                 return id;
             }
@@ -209,6 +240,7 @@ namespace UsermanagerService.Models
                 IdCommand.Dispose();
                 insertCommand.Dispose();
                 connection.Close();
+                adapter.Dispose();
                 return -1; 
             }
             catch (MySqlException)
@@ -216,7 +248,8 @@ namespace UsermanagerService.Models
                 IdCommand.Dispose();
                 insertCommand.Dispose();
                 connection.Close();
-                throw new DatabaseException("DATABASE ERROR");
+                adapter.Dispose();
+                throw;
             }
         }
         /// <summary>
@@ -232,22 +265,82 @@ namespace UsermanagerService.Models
                     
             //Command
             MySqlCommand Fetch = new MySqlCommand("SELECT * FROM user", connection);
+            MySqlDataReader reader = Fetch.ExecuteReader();
             try
             {
                 connection.Open();
-                MySqlDataReader reader = Fetch.ExecuteReader();
+                
 
                 while (reader.Read()) { 
                     users.Add(new User((int)reader[0], (string)reader[1], (string)reader[2], (string)reader[3], (string)reader[4]));
                 }
 
+                Fetch.Dispose();
+                reader.Dispose();
                 connection.Close();
                 return users;
-            }catch(MySqlException ex)
+            }catch(MySqlException)
             {
+                Fetch.Dispose();
+                reader.Dispose();
                 connection.Close();
-                throw new DatabaseException(ex.Message);
+                throw;
             }
         }
+
+        public void CreateUsersForTesting(int amount){
+    
+			MySqlConnection connection = new(connectionString);
+
+			StringBuilder sb = new StringBuilder($"INSERT INTO user (username, city, institute, role) VALUES ");
+			List<string> rows = new List<string>();
+
+
+			List<string> newUsers = new();
+			for(int i = 1;i <= amount; i++){
+			    newUsers.Add($"{i}");
+			}
+			foreach(var id in newUsers)
+			{
+				rows.Add(string.Format("('{0}', '{1}', '{2}', '{3}')", MySqlHelper.EscapeString("username"+id), MySqlHelper.EscapeString("aalborg"), MySqlHelper.EscapeString("steve"), MySqlHelper.EscapeString("student")));
+			}
+			sb.Append(string.Join(",", rows));
+			sb.Append(";");
+
+			string SQLstatement = sb.ToString();
+
+
+
+			connection.Open();
+			MySqlCommand command = new MySqlCommand(SQLstatement, connection);
+			MySqlDataAdapter adapter = new MySqlDataAdapter();
+
+
+			command.CommandType = CommandType.Text;
+			adapter.InsertCommand = command;
+			adapter.InsertCommand.ExecuteNonQuery();
+
+			command.Dispose();
+			adapter.Dispose();
+
+			connection.Close();
+
+            connection.Open();
+
+
+            StringBuilder sb2 = new StringBuilder($"INSERT INTO password (userid, password) VALUES ");
+            List<string> rows2 = new List<string>();
+            foreach(var id in newUsers)
+			{
+				rows2.Add(string.Format("('{0}', '{1}')", MySqlHelper.EscapeString($"{id}"), MySqlHelper.EscapeString("password")));
+			}
+            sb2.Append(string.Join(",", rows2));
+			sb2.Append(";");
+            string query = sb2.ToString();
+            MySqlCommand passwordCommand = new MySqlCommand(query, connection);
+            passwordCommand.ExecuteNonQuery();
+            passwordCommand.Dispose();
+            connection.Close();
+		}
     }
 }

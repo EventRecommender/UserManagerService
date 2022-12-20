@@ -41,7 +41,7 @@ namespace UsermanagerService.Models
                 else { return null; }
                  
             }
-            catch (InstanceException) { throw new Exception("0"); }
+            catch (InstanceException) { throw; }
         }
 
         /// <summary>
